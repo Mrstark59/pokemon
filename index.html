@@ -1,22 +1,117 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>PokeLike ⚡</title>
+<title>PokéLike</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"/>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<style>*{box-sizing:border-box;margin:0;padding:0;}body{background:#09091a;}</style>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:#06060f;color:#e8e8f8;font-family:'Press Start 2P',monospace;min-height:100vh;}
+img{image-rendering:pixelated;}
+@keyframes pulse{0%,100%{box-shadow:0 0 8px var(--gc,#e8d048)55,0 0 20px var(--gc,#e8d048)22;}50%{box-shadow:0 0 16px var(--gc,#e8d048)99,0 0 40px var(--gc,#e8d048)44;}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+@keyframes hpBar{from{width:100%;}to{width:var(--w,100%);}}
+@keyframes starField{0%{opacity:.3;}50%{opacity:.8;}100%{opacity:.3;}}
+.pulse{animation:pulse 2s ease-in-out infinite;}
+.fadeUp{animation:fadeUp .35s ease-out;}
+::-webkit-scrollbar{width:5px;}::-webkit-scrollbar-track{background:#06060f;}::-webkit-scrollbar-thumb{background:#2a2a4a;border-radius:3px;}
+</style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const{useState,useEffect,useRef}=React;
+const{useState,useEffect,useRef,useCallback}=React;
 
+/* ═══════════════════════════════════════════════════
+   DONNÉES PAR GÉNÉRATION
+   z1=Lv12 z2=Lv22 z3=Lv32 z4=Lv42 z5=Lv52
+═══════════════════════════════════════════════════ */
+const GENS={
+  1:{n:"Gén. I",   reg:"Kanto",   ver:"Rouge / Bleu",      col:"#e84848",col2:"#4060e8",bkg:"radial-gradient(ellipse at 30% 40%,#2a0808 0%,#06060f 70%)",
+     st:[1,4,7],
+     z1:[16,19,10,13,21,25,29,32,39,41,43,46,48],
+     z2:[54,58,63,66,69,74,79,81,84,96,100,102,111],
+     z3:[92,104,109,116,123,133,137,117,120],
+     z4:[93,78,110,125,126,129,130,134,135,136],
+     z5:[94,131,142,143,147,148,149,144,145,146],
+     zn:["Route 1","Forêt de Jade","Mt. Sélénite","Route Victoire","Ligue Indigo"]},
+  2:{n:"Gén. II",  reg:"Johto",   ver:"Or / Argent",        col:"#e8c030",col2:"#b8b8b8",bkg:"radial-gradient(ellipse at 60% 30%,#1e1400 0%,#06060f 70%)",
+     st:[152,155,158],
+     z1:[163,165,177,183,187,191,194,204,10,16,39,41],
+     z2:[161,179,220,231,54,58,63,79,96,111,66,69],
+     z3:[92,175,208,215,218,228,104,133,137,116],
+     z4:[196,197,229,242,93,78,110,126,130,134],
+     z5:[248,94,131,143,149,245,246,247],
+     zn:["Route 29","Parc Jasmin","Tour Lagon","Route 44","Ligue Johto"]},
+  3:{n:"Gén. III", reg:"Hoenn",   ver:"Rubis / Saphir",     col:"#4888e8",col2:"#e04060",bkg:"radial-gradient(ellipse at 40% 60%,#000c28 0%,#06060f 70%)",
+     st:[252,255,258],
+     z1:[261,263,265,278,283,285,293,163,16,10,41,46],
+     z2:[270,296,313,331,339,54,79,96,111,161,220,231],
+     z3:[315,322,328,333,341,353,355,92,104,228,215,116],
+     z4:[330,359,373,350,344,348,229,248,196,197,126,130],
+     z5:[376,375,373,350,248,94,131,149,143,229],
+     zn:["Route 101","Forêt de Petalburg","Grotte Météore","Route Victoire","Ligue Hoenn"]},
+  4:{n:"Gén. IV",  reg:"Sinnoh",  ver:"Diamant / Perle",    col:"#80c8f8",col2:"#e8b8d8",bkg:"radial-gradient(ellipse at 50% 20%,#061828 0%,#06060f 70%)",
+     st:[387,390,393],
+     z1:[399,401,406,417,418,420,425,427,261,163,41,16],
+     z2:[403,415,422,431,443,129,161,270,296,339,220,231],
+     z3:[442,446,451,453,456,459,228,315,333,353,355,104],
+     z4:[448,450,461,462,463,464,466,229,330,376,196,197],
+     z5:[445,471,472,475,479,483,484,248,376,149,143,94],
+     zn:["Route 201","Forêt Jubilée","Mont Couronné","Route Victoire","Ligue Sinnoh"]},
+  5:{n:"Gén. V",   reg:"Unys",    ver:"Noir / Blanc",        col:"#c8c8d0",col2:"#282830",bkg:"radial-gradient(ellipse at 50% 50%,#181820 0%,#06060f 70%)",
+     st:[495,498,501],
+     z1:[519,522,524,527,529,540,543,548,261,399,401,163],
+     z2:[556,561,570,572,577,582,587,590,403,443,270,339],
+     z3:[595,597,599,607,610,616,624,92,442,451,353,228],
+     z4:[609,621,625,631,638,639,640,448,461,471,229,248],
+     z5:[635,637,641,642,644,645,646,445,483,149,94,143],
+     zn:["Route 1 (Unys)","Forêt Noire","Caverne Caillasse","Falaises Noires","Ligue Unys"]},
+  6:{n:"Gén. VI",  reg:"Kalos",   ver:"X / Y",               col:"#5888e8",col2:"#e85858",bkg:"radial-gradient(ellipse at 30% 50%,#080c28 0%,#06060f 70%)",
+     st:[650,653,656],
+     z1:[659,661,664,667,669,674,682,684,399,522,261,529],
+     z2:[686,688,692,694,696,699,701,443,570,443,403,339],
+     z3:[704,707,709,711,714,557,572,624,228,315,442,610],
+     z4:[706,530,609,625,631,638,448,461,471,248,229,376],
+     z5:[718,716,717,635,646,645,445,483,149,94,143,248],
+     zn:["Bois Tamisé","Voie Venteuse","Grande Roue","Route Victoire","Ligue Kalos"]},
+  7:{n:"Gén. VII", reg:"Alola",   ver:"Soleil / Lune",       col:"#f8b040",col2:"#6068c8",bkg:"radial-gradient(ellipse at 60% 60%,#1a0c04 0%,#06060f 70%)",
+     st:[722,725,728],
+     z1:[742,744,747,749,755,757,759,761,764,519,399,261],
+     z2:[769,771,774,778,781,783,686,677,570,443,403,296],
+     z3:[786,789,793,794,550,624,703,625,453,711,228,442],
+     z4:[791,792,796,799,638,716,471,462,448,248,229,376],
+     z5:[800,791,792,718,635,646,645,445,483,149,94,143],
+     zn:["Route 1 (Alola)","Forêt Wela","Caverne Diglett","Route Victoire","Ligue Alola"]},
+  8:{n:"Gén. VIII",reg:"Galar",   ver:"Épée / Bouclier",     col:"#3878e8",col2:"#e04878",bkg:"radial-gradient(ellipse at 40% 30%,#040828 0%,#06060f 70%)",
+     st:[810,813,816],
+     z1:[819,821,824,827,829,831,833,840,742,399,522,261],
+     z2:[843,845,847,850,856,859,861,570,694,703,403,339],
+     z3:[863,867,870,874,878,885,624,711,453,442,228,315],
+     z4:[884,876,869,638,716,791,448,462,471,248,229,376],
+     z5:[888,889,890,898,800,635,718,646,445,149,94,483],
+     zn:["Route 1 (Galar)","Forêt de Glimwood","Pic Couronné","Route Victoire","Ligue Galar"]},
+  9:{n:"Gén. IX",  reg:"Paldea",  ver:"Écarlate / Violet",   col:"#b830c8",col2:"#c83020",bkg:"radial-gradient(ellipse at 70% 40%,#14021c 0%,#06060f 70%)",
+     st:[906,909,912],
+     z1:[915,917,919,921,924,926,928,399,261,742,519,163],
+     z2:[933,935,939,941,946,947,570,694,403,686,443,403],
+     z3:[953,955,959,963,965,624,711,442,228,315,453,867],
+     z4:[967,972,977,979,638,716,800,887,448,248,376,462],
+     z5:[984,988,993,995,888,890,646,718,635,149,483,445],
+     zn:["Province Sud","Forêt Sévineige","Cascarrafa","Route Victoire","Ligue Paldea"]},
+};
+
+/* ═══════════════════════════════════════════════════
+   TYPES EN FRANÇAIS
+═══════════════════════════════════════════════════ */
 const TC={
   normal:{rock:.5,ghost:0,steel:.5},fire:{fire:.5,water:.5,grass:2,ice:2,bug:2,rock:.5,dragon:.5,steel:2},
-  water:{fire:2,water:.5,grass:.5,ground:2,rock:2,dragon:.5},electric:{water:2,electric:.5,grass:.5,ground:0,flying:2,dragon:.5},
+  water:{fire:2,water:.5,grass:.5,ground:2,rock:2,dragon:.5},
+  electric:{water:2,electric:.5,grass:.5,ground:0,flying:2,dragon:.5},
   grass:{fire:.5,water:2,grass:.5,poison:.5,ground:2,flying:.5,bug:.5,rock:2,dragon:.5,steel:.5},
   ice:{water:.5,grass:2,ice:.5,ground:2,flying:2,dragon:2,steel:.5},
   fighting:{normal:2,ice:2,poison:.5,flying:.5,psychic:.5,bug:.5,rock:2,ghost:0,dark:2,steel:2,fairy:.5},
@@ -26,594 +121,989 @@ const TC={
   psychic:{fighting:2,poison:2,psychic:.5,dark:0,steel:.5},
   bug:{fire:.5,grass:2,fighting:.5,poison:.5,flying:.5,psychic:2,ghost:.5,dark:2,steel:.5,fairy:.5},
   rock:{fire:2,ice:2,fighting:.5,ground:.5,flying:2,bug:2,steel:.5},
-  ghost:{normal:0,psychic:2,ghost:2,dark:.5},dragon:{dragon:2,steel:.5,fairy:0},
+  ghost:{normal:0,psychic:2,ghost:2,dark:.5},
+  dragon:{dragon:2,steel:.5,fairy:0},
   dark:{fighting:.5,psychic:2,ghost:2,dark:.5,fairy:.5},
   steel:{fire:.5,water:.5,electric:.5,ice:2,rock:2,steel:.5,fairy:2},
   fairy:{fire:.5,fighting:2,poison:.5,dragon:2,dark:2,steel:.5},
 };
 const typeEff=(mt,dts)=>dts.reduce((m,dt)=>m*(TC[mt]?.[dt]??1),1);
-const TC2={
-  normal:"#9e9e9e",fire:"#e74c3c",water:"#3498db",grass:"#27ae60",electric:"#f1c40f",ice:"#00cec9",
+const TNOM={normal:"Normal",fire:"Feu",water:"Eau",grass:"Plante",electric:"Électrik",ice:"Glace",
+  fighting:"Combat",poison:"Poison",ground:"Sol",flying:"Vol",psychic:"Psy",bug:"Insecte",
+  rock:"Roche",ghost:"Spectre",dragon:"Dragon",dark:"Ténèbres",steel:"Acier",fairy:"Fée"};
+const TCOL={normal:"#9e9e9e",fire:"#e74c3c",water:"#3498db",grass:"#27ae60",electric:"#f1c40f",ice:"#00cec9",
   fighting:"#c0392b",poison:"#9b59b6",ground:"#d4a94e",flying:"#a29bfe",psychic:"#fd79a8",bug:"#6ab04c",
-  rock:"#a59650",ghost:"#6c5ce7",dragon:"#6c3483",dark:"#2d3436",steel:"#95a5a6",fairy:"#ff6b9d",
-};
+  rock:"#a59650",ghost:"#6c5ce7",dragon:"#6c3483",dark:"#2d3436",steel:"#95a5a6",fairy:"#ff6b9d"};
 
-const MOVES={
+/* ═══════════════════════════════════════════════════
+   CAPACITÉS
+═══════════════════════════════════════════════════ */
+const CAP={
   "tackle":{p:40,t:"normal",dc:"phy",a:100,pp:35},"body-slam":{p:85,t:"normal",dc:"phy",a:100,pp:15,eff:"par",ec:30},
   "swift":{p:60,t:"normal",dc:"spe",a:999,pp:20},"double-edge":{p:120,t:"normal",dc:"phy",a:100,pp:15,rcl:.33},
   "quick-attack":{p:40,t:"normal",dc:"phy",a:100,pp:30,pri:1},"hyper-beam":{p:150,t:"normal",dc:"spe",a:90,pp:5},
   "giga-impact":{p:150,t:"normal",dc:"phy",a:90,pp:5},"extreme-speed":{p:80,t:"normal",dc:"phy",a:100,pp:5,pri:2},
+  "headbutt":{p:70,t:"normal",dc:"phy",a:100,pp:15},"pound":{p:40,t:"normal",dc:"phy",a:100,pp:35},
+  "scratch":{p:40,t:"normal",dc:"phy",a:100,pp:35},"stomp":{p:65,t:"normal",dc:"phy",a:100,pp:20},
   "ember":{p:40,t:"fire",dc:"spe",a:100,pp:25,eff:"brn",ec:10},"flamethrower":{p:90,t:"fire",dc:"spe",a:100,pp:15,eff:"brn",ec:10},
   "fire-blast":{p:110,t:"fire",dc:"spe",a:85,pp:5,eff:"brn",ec:10},"fire-punch":{p:75,t:"fire",dc:"phy",a:100,pp:15,eff:"brn",ec:10},
-  "flare-blitz":{p:120,t:"fire",dc:"phy",a:100,pp:15,rcl:.33},"heat-wave":{p:95,t:"fire",dc:"spe",a:90,pp:10,eff:"brn",ec:10},
-  "sacred-fire":{p:100,t:"fire",dc:"phy",a:95,pp:5,eff:"brn",ec:50},"overheat":{p:130,t:"fire",dc:"spe",a:90,pp:5},
+  "flare-blitz":{p:120,t:"fire",dc:"phy",a:100,pp:15,rcl:.33},"overheat":{p:130,t:"fire",dc:"spe",a:90,pp:5},
+  "sacred-fire":{p:100,t:"fire",dc:"phy",a:95,pp:5,eff:"brn",ec:50},"heat-wave":{p:95,t:"fire",dc:"spe",a:90,pp:10},
+  "flame-wheel":{p:60,t:"fire",dc:"phy",a:100,pp:25,eff:"brn",ec:10},
   "water-gun":{p:40,t:"water",dc:"spe",a:100,pp:25},"surf":{p:90,t:"water",dc:"spe",a:100,pp:15},
   "hydro-pump":{p:110,t:"water",dc:"spe",a:80,pp:5},"waterfall":{p:80,t:"water",dc:"phy",a:100,pp:15},
   "aqua-jet":{p:40,t:"water",dc:"phy",a:100,pp:20,pri:1},"scald":{p:80,t:"water",dc:"spe",a:100,pp:15,eff:"brn",ec:30},
-  "liquidation":{p:85,t:"water",dc:"phy",a:100,pp:10},"origin-pulse":{p:110,t:"water",dc:"spe",a:85,pp:10},
+  "liquidation":{p:85,t:"water",dc:"phy",a:100,pp:10},"water-pulse":{p:60,t:"water",dc:"spe",a:100,pp:20},
   "vine-whip":{p:45,t:"grass",dc:"phy",a:100,pp:25},"razor-leaf":{p:55,t:"grass",dc:"phy",a:95,pp:25,crit:1},
   "energy-ball":{p:90,t:"grass",dc:"spe",a:100,pp:10},"leaf-blade":{p:90,t:"grass",dc:"phy",a:100,pp:15,crit:1},
-  "sleep-powder":{p:0,t:"grass",dc:"sta",a:75,pp:15,sta:"slp"},"petal-blizzard":{p:90,t:"grass",dc:"phy",a:90,pp:15},
-  "power-whip":{p:120,t:"grass",dc:"phy",a:85,pp:10},"giga-drain":{p:75,t:"grass",dc:"spe",a:100,pp:10},
+  "sleep-powder":{p:0,t:"grass",dc:"sta",a:75,pp:15,sta:"slp"},"power-whip":{p:120,t:"grass",dc:"phy",a:85,pp:10},
+  "petal-blizzard":{p:90,t:"grass",dc:"phy",a:90,pp:15},"giga-drain":{p:75,t:"grass",dc:"spe",a:100,pp:10},
+  "absorb":{p:20,t:"grass",dc:"spe",a:100,pp:25},"mega-drain":{p:40,t:"grass",dc:"spe",a:100,pp:15},
   "thunder-shock":{p:40,t:"electric",dc:"spe",a:100,pp:30,eff:"par",ec:10},"thunderbolt":{p:90,t:"electric",dc:"spe",a:100,pp:15,eff:"par",ec:10},
   "thunder":{p:110,t:"electric",dc:"spe",a:70,pp:10,eff:"par",ec:30},"thunder-punch":{p:75,t:"electric",dc:"phy",a:100,pp:15,eff:"par",ec:10},
   "thunder-wave":{p:0,t:"electric",dc:"sta",a:90,pp:20,sta:"par"},"volt-tackle":{p:120,t:"electric",dc:"phy",a:100,pp:15,rcl:.33,eff:"par",ec:10},
   "wild-charge":{p:90,t:"electric",dc:"phy",a:100,pp:15,rcl:.25},"discharge":{p:80,t:"electric",dc:"spe",a:100,pp:15,eff:"par",ec:30},
+  "spark":{p:65,t:"electric",dc:"phy",a:100,pp:20,eff:"par",ec:30},
   "ice-punch":{p:75,t:"ice",dc:"phy",a:100,pp:15,eff:"frz",ec:10},"ice-beam":{p:90,t:"ice",dc:"spe",a:100,pp:10,eff:"frz",ec:10},
   "blizzard":{p:110,t:"ice",dc:"spe",a:70,pp:5,eff:"frz",ec:10},"icicle-crash":{p:85,t:"ice",dc:"phy",a:90,pp:10},
-  "freeze-dry":{p:70,t:"ice",dc:"spe",a:100,pp:20,eff:"frz",ec:10},"glacial-lance":{p:120,t:"ice",dc:"phy",a:95,pp:5},
+  "freeze-dry":{p:70,t:"ice",dc:"spe",a:100,pp:20,eff:"frz",ec:10},"powder-snow":{p:40,t:"ice",dc:"spe",a:100,pp:25,eff:"frz",ec:10},
   "brick-break":{p:75,t:"fighting",dc:"phy",a:100,pp:15},"close-combat":{p:120,t:"fighting",dc:"phy",a:100,pp:5},
   "focus-blast":{p:120,t:"fighting",dc:"spe",a:70,pp:5},"mach-punch":{p:40,t:"fighting",dc:"phy",a:100,pp:30,pri:1},
   "aura-sphere":{p:80,t:"fighting",dc:"spe",a:999,pp:20},"high-jump-kick":{p:130,t:"fighting",dc:"phy",a:90,pp:10},
-  "superpower":{p:120,t:"fighting",dc:"phy",a:100,pp:5},"cross-chop":{p:100,t:"fighting",dc:"phy",a:80,pp:5,crit:1},
+  "karate-chop":{p:50,t:"fighting",dc:"phy",a:100,pp:25,crit:1},"low-kick":{p:50,t:"fighting",dc:"phy",a:100,pp:20},
   "poison-jab":{p:80,t:"poison",dc:"phy",a:100,pp:20,eff:"psn",ec:30},"sludge-bomb":{p:90,t:"poison",dc:"spe",a:100,pp:10,eff:"psn",ec:30},
   "gunk-shot":{p:120,t:"poison",dc:"phy",a:80,pp:5,eff:"psn",ec:30},"toxic":{p:0,t:"poison",dc:"sta",a:90,pp:10,sta:"bpsn"},
-  "sludge-wave":{p:95,t:"poison",dc:"spe",a:100,pp:10,eff:"psn",ec:10},
+  "sludge":{p:65,t:"poison",dc:"spe",a:100,pp:20,eff:"psn",ec:30},"acid":{p:40,t:"poison",dc:"spe",a:100,pp:30},
+  "poison-sting":{p:15,t:"poison",dc:"phy",a:100,pp:35,eff:"psn",ec:30},
   "earthquake":{p:100,t:"ground",dc:"phy",a:100,pp:10},"earth-power":{p:90,t:"ground",dc:"spe",a:100,pp:10},
   "drill-run":{p:80,t:"ground",dc:"phy",a:95,pp:10,crit:1},"high-horsepower":{p:95,t:"ground",dc:"phy",a:95,pp:10},
+  "mud-slap":{p:20,t:"ground",dc:"spe",a:100,pp:10},"mud-shot":{p:55,t:"ground",dc:"spe",a:95,pp:15},
   "wing-attack":{p:60,t:"flying",dc:"phy",a:100,pp:35},"aerial-ace":{p:60,t:"flying",dc:"phy",a:999,pp:20},
   "air-slash":{p:75,t:"flying",dc:"spe",a:95,pp:15},"brave-bird":{p:120,t:"flying",dc:"phy",a:100,pp:15,rcl:.33},
-  "hurricane":{p:110,t:"flying",dc:"spe",a:70,pp:10},"sky-attack":{p:140,t:"flying",dc:"phy",a:90,pp:5},
+  "hurricane":{p:110,t:"flying",dc:"spe",a:70,pp:10},"gust":{p:40,t:"flying",dc:"spe",a:100,pp:35},
+  "peck":{p:35,t:"flying",dc:"phy",a:100,pp:35},
   "confusion":{p:50,t:"psychic",dc:"spe",a:100,pp:25},"psychic":{p:90,t:"psychic",dc:"spe",a:100,pp:10},
   "zen-headbutt":{p:80,t:"psychic",dc:"phy",a:90,pp:15},"psyshock":{p:80,t:"psychic",dc:"spe",a:100,pp:10},
-  "psycho-cut":{p:70,t:"psychic",dc:"phy",a:100,pp:20,crit:1},
+  "psybeam":{p:65,t:"psychic",dc:"spe",a:100,pp:20},
   "bug-bite":{p:60,t:"bug",dc:"phy",a:100,pp:20},"x-scissor":{p:80,t:"bug",dc:"phy",a:100,pp:15},
   "bug-buzz":{p:90,t:"bug",dc:"spe",a:100,pp:10},"megahorn":{p:120,t:"bug",dc:"phy",a:85,pp:10},
-  "lunge":{p:80,t:"bug",dc:"phy",a:100,pp:15},"attack-order":{p:90,t:"bug",dc:"phy",a:100,pp:15,crit:1},
+  "signal-beam":{p:75,t:"bug",dc:"spe",a:100,pp:15},"string-shot":{p:0,t:"bug",dc:"sta",a:95,pp:40},
   "rock-slide":{p:75,t:"rock",dc:"phy",a:90,pp:10},"stone-edge":{p:100,t:"rock",dc:"phy",a:80,pp:5,crit:1},
   "power-gem":{p:80,t:"rock",dc:"spe",a:100,pp:20},"head-smash":{p:150,t:"rock",dc:"phy",a:80,pp:5,rcl:.5},
+  "rock-throw":{p:50,t:"rock",dc:"phy",a:90,pp:15},
   "shadow-ball":{p:80,t:"ghost",dc:"spe",a:100,pp:15},"shadow-claw":{p:70,t:"ghost",dc:"phy",a:100,pp:15,crit:1},
   "will-o-wisp":{p:0,t:"ghost",dc:"sta",a:85,pp:15,sta:"brn"},"shadow-force":{p:120,t:"ghost",dc:"phy",a:100,pp:5},
-  "hex":{p:65,t:"ghost",dc:"spe",a:100,pp:10},"poltergeist":{p:110,t:"ghost",dc:"phy",a:90,pp:5},
+  "hex":{p:65,t:"ghost",dc:"spe",a:100,pp:10},"lick":{p:30,t:"ghost",dc:"phy",a:100,pp:30,eff:"par",ec:30},
   "dragon-pulse":{p:85,t:"dragon",dc:"spe",a:100,pp:10},"dragon-claw":{p:80,t:"dragon",dc:"phy",a:100,pp:15},
   "outrage":{p:120,t:"dragon",dc:"phy",a:100,pp:10},"draco-meteor":{p:130,t:"dragon",dc:"spe",a:90,pp:5},
-  "spacial-rend":{p:100,t:"dragon",dc:"spe",a:95,pp:5,crit:1},
-  "bite":{p:60,t:"dark",dc:"phy",a:100,pp:25},"crunch":{p:80,t:"dark",dc:"phy",a:100,pp:15},
-  "dark-pulse":{p:80,t:"dark",dc:"spe",a:100,pp:15},"night-slash":{p:70,t:"dark",dc:"phy",a:100,pp:15,crit:1},
-  "sucker-punch":{p:70,t:"dark",dc:"phy",a:100,pp:5,pri:1},"wicked-blow":{p:80,t:"dark",dc:"phy",a:100,pp:5,crit:1},
+  "crunch":{p:80,t:"dark",dc:"phy",a:100,pp:15},"dark-pulse":{p:80,t:"dark",dc:"spe",a:100,pp:15},
+  "night-slash":{p:70,t:"dark",dc:"phy",a:100,pp:15,crit:1},"sucker-punch":{p:70,t:"dark",dc:"phy",a:100,pp:5,pri:1},
+  "bite":{p:60,t:"dark",dc:"phy",a:100,pp:25},
   "iron-head":{p:80,t:"steel",dc:"phy",a:100,pp:15},"flash-cannon":{p:80,t:"steel",dc:"spe",a:100,pp:10},
   "meteor-mash":{p:90,t:"steel",dc:"phy",a:90,pp:10},"steel-beam":{p:140,t:"steel",dc:"spe",a:95,pp:5},
-  "iron-tail":{p:100,t:"steel",dc:"phy",a:75,pp:15},
   "moonblast":{p:95,t:"fairy",dc:"spe",a:100,pp:15},"play-rough":{p:90,t:"fairy",dc:"phy",a:90,pp:10},
   "dazzling-gleam":{p:80,t:"fairy",dc:"spe",a:100,pp:10},"spirit-break":{p:75,t:"fairy",dc:"phy",a:100,pp:15},
-  "fairy-wind":{p:40,t:"fairy",dc:"spe",a:100,pp:30},
 };
 
-const ITEMS_POOL=[
-  {id:"potion",name:"Potion",emoji:"🧪",desc:"Restores 50 HP",heal:50},
-  {id:"super-potion",name:"Super Potion",emoji:"💊",desc:"Restores 120 HP",heal:120},
-  {id:"hyper-potion",name:"Hyper Potion",emoji:"💉",desc:"Restores 200 HP",heal:200},
-  {id:"full-restore",name:"Full Restore",emoji:"✨",desc:"Full HP + cures status",healFull:true,cure:true},
-  {id:"revive",name:"Revive",emoji:"💫",desc:"Revive fainted (50% HP)",revive:true},
-  {id:"x-attack",name:"X Attack",emoji:"⚔️",desc:"+2 Attack stages",boost:{attack:2}},
-  {id:"x-sp-atk",name:"X Sp. Atk",emoji:"🌟",desc:"+2 Sp.Atk stages",boost:{specialAttack:2}},
-  {id:"x-speed",name:"X Speed",emoji:"💨",desc:"+2 Speed stages",boost:{speed:2}},
-  {id:"leftovers",name:"Leftovers",emoji:"🥗",desc:"Recover 1/16 HP/turn",held:"leftovers"},
-  {id:"choice-band",name:"Choice Band",emoji:"🎀",desc:"1.5× Attack",held:"choice-band"},
-  {id:"choice-specs",name:"Choice Specs",emoji:"👓",desc:"1.5× Sp.Atk",held:"choice-specs"},
-  {id:"life-orb",name:"Life Orb",emoji:"🔮",desc:"1.3× dmg, 10% recoil",held:"life-orb"},
-  {id:"lum-berry",name:"Lum Berry",emoji:"🍇",desc:"Auto-cures any status",held:"lum-berry"},
-  {id:"sitrus-berry",name:"Sitrus Berry",emoji:"🍊",desc:"Heals 25% HP when below 50%",held:"sitrus-berry"},
-  {id:"focus-sash",name:"Focus Sash",emoji:"🥋",desc:"Survive 1 KO at full HP",held:"focus-sash"},
-];
+/* ═══════════════════════════════════════════════════
+   OBJETS (complet, en français)
+═══════════════════════════════════════════════════ */
+const OBJETS_PAR_ZONE={
+  1:[ /* médecines basiques */
+    {id:"potion",    nom:"Potion",        e:"🧪",cat:"méd",  desc:"Restaure 50 PV",                    heal:50},
+    {id:"antidote",  nom:"Antidote",      e:"🌿",cat:"méd",  desc:"Soigne l'empoisonnement",           cureStatus:"psn"},
+    {id:"brule-soin",nom:"Soin Brûlure",  e:"❄️",cat:"méd",  desc:"Soigne la brûlure",                cureStatus:"brn"},
+    {id:"x-atk",     nom:"X Attaque",     e:"⚔️",cat:"combat",desc:"+2 Attaque ce combat",              boost:{attack:2}},
+    {id:"x-vit",     nom:"X Vitesse",     e:"💨",cat:"combat",desc:"+2 Vitesse ce combat",              boost:{speed:2}},
+  ],
+  2:[ /* médecines + premières baies */
+    {id:"super-p",   nom:"Super Potion",  e:"💊",cat:"méd",  desc:"Restaure 120 PV",                  heal:120},
+    {id:"paraly-soin",nom:"Soin Paralysie",e:"⚡",cat:"méd", desc:"Soigne la paralysie",              cureStatus:"par"},
+    {id:"reveil",    nom:"Réveil",        e:"☕",cat:"méd",  desc:"Réveille d'un sommeil",             cureStatus:"slp"},
+    {id:"x-spatk",   nom:"X Atq. Spé.",  e:"🌟",cat:"combat",desc:"+2 Atq. Spé. ce combat",           boost:{specialAttack:2}},
+    {id:"baie-ceriz",nom:"Baie Ceriz",    e:"🍒",cat:"baie", desc:"Soigne la paralysie (tenu)",        held:"cheri-berry"},
+    {id:"baie-pecha",nom:"Baie Pêcha",    e:"🍑",cat:"baie", desc:"Soigne le poison (tenu)",           held:"pecha-berry"},
+    {id:"baie-fraba",nom:"Baie Fraba",    e:"🫒",cat:"baie", desc:"Soigne la brûlure (tenu)",          held:"rawst-berry"},
+  ],
+  3:[ /* médecines avancées + baies utiles */
+    {id:"hyper-p",   nom:"Hyper Potion",  e:"💉",cat:"méd",  desc:"Restaure 200 PV",                  heal:200},
+    {id:"antidot-t", nom:"Antidot Total", e:"🩹",cat:"méd",  desc:"Soigne tout trouble de statut",    cureAll:true},
+    {id:"rappel",    nom:"Rappel",        e:"💫",cat:"méd",  desc:"Relève un Pokémon évanoui (50% PV)",revive:true},
+    {id:"x-def",     nom:"X Défense",     e:"🛡️",cat:"combat",desc:"+2 Défense ce combat",             boost:{defense:2}},
+    {id:"x-defsp",   nom:"X Déf. Spé.",  e:"💠",cat:"combat",desc:"+2 Déf. Spé. ce combat",           boost:{specialDefense:2}},
+    {id:"baie-mepo", nom:"Baie Mépo",     e:"🫐",cat:"baie", desc:"Soigne le sommeil (tenu)",          held:"chesto-berry"},
+    {id:"baie-aspic",nom:"Baie Aspic",    e:"🍐",cat:"baie", desc:"Soigne le gel (tenu)",              held:"aspear-berry"},
+    {id:"baie-sitrus",nom:"Baie Sitrus",  e:"🍊",cat:"baie", desc:"Restaure 25% PV sous 50% PV (tenu)",held:"sitrus-berry"},
+    {id:"restes",    nom:"Restes",        e:"🥗",cat:"tenu", desc:"Restaure 1/16 PV max/tour (tenu)", held:"leftovers"},
+  ],
+  4:[ /* objets tenus + rappel max */
+    {id:"giga-p",    nom:"Méga Potion",   e:"🍶",cat:"méd",  desc:"Restaure tous les PV",             healFull:true},
+    {id:"rappel-max",nom:"Maxi Rappel",   e:"💎",cat:"méd",  desc:"Relève un Pokémon évanoui (PV max)",maxRevive:true},
+    {id:"elixir",    nom:"Élixir",        e:"⚗️",cat:"méd",  desc:"Restaure tous les PP",             maxElixir:true},
+    {id:"choix-bande",nom:"Choix Bande",  e:"🎀",cat:"tenu", desc:"Att. ×1.5 mais 1 seule capacité (tenu)",held:"choice-band"},
+    {id:"choix-lun", nom:"Choix Lunettes",e:"👓",cat:"tenu", desc:"Atq. Spé. ×1.5 mais 1 seule cap. (tenu)",held:"choice-specs"},
+    {id:"ceinture-f",nom:"Ceinture Focus",e:"🥋",cat:"tenu", desc:"Survive un KO depuis PV max (tenu)",held:"focus-sash"},
+    {id:"baie-fraive",nom:"Baie Fraive",  e:"🍇",cat:"baie", desc:"Soigne tout statut automatiquement (tenu)",held:"lum-berry"},
+    {id:"sonnaille",  nom:"Sonnaille",    e:"🔔",cat:"tenu", desc:"Restaure 1/8 des PV infligés (tenu)",held:"shell-bell"},
+    {id:"griffe-rap",nom:"Griffe Rapide", e:"⚡",cat:"tenu", desc:"20% de chance d'agir en premier (tenu)",held:"quick-claw"},
+    {id:"ceinture-ex",nom:"Ceinture Expert",e:"🥊",cat:"tenu",desc:"Dégâts ×1.2 si super efficace (tenu)",held:"expert-belt"},
+  ],
+  5:[ /* objets rares et puissants */
+    {id:"guerison-t",nom:"Guérison Totale",e:"✨",cat:"méd", desc:"PV max + soigne tout statut",      healFull:true,cure:true},
+    {id:"rappel-max",nom:"Maxi Rappel",   e:"💎",cat:"méd",  desc:"Relève un Pokémon évanoui (PV max)",maxRevive:true},
+    {id:"mega-elixir",nom:"Méga Élixir",  e:"🔮",cat:"méd",  desc:"Restaure tous les PP de toutes les capacités",maxElixir:true},
+    {id:"orbe-vie",  nom:"Orbe Vie",      e:"❤️",cat:"tenu", desc:"Dégâts ×1.3 mais 10% recul PV (tenu)",held:"life-orb"},
+    {id:"choix-bande",nom:"Choix Bande",  e:"🎀",cat:"tenu", desc:"Att. ×1.5 mais 1 seule capacité (tenu)",held:"choice-band"},
+    {id:"choix-lun", nom:"Choix Lunettes",e:"👓",cat:"tenu", desc:"Atq. Spé. ×1.5 (tenu)",            held:"choice-specs"},
+    {id:"choix-four",nom:"Choix Foulard", e:"🧣",cat:"tenu", desc:"Vitesse ×1.5 mais 1 seule cap. (tenu)",held:"choice-scarf"},
+    {id:"gilet-assaut",nom:"Gilet Assaut",e:"🦺",cat:"tenu", desc:"Déf. Spé. ×1.5 (tenu, pas de statut)",held:"assault-vest"},
+    {id:"casque-roc",nom:"Casque Rocher", e:"⛑️",cat:"tenu", desc:"Inflige 1/6 PV aux att. physiques (tenu)",held:"rocky-helmet"},
+    {id:"lentille-p",nom:"Lentille Précise",e:"🔭",cat:"tenu",desc:"Augmente le taux de coups critiques (tenu)",held:"scope-lens"},
+    {id:"baie-salac",nom:"Baie Salac",    e:"🌶️",cat:"baie", desc:"Augmente Vitesse sous 25% PV (tenu)",held:"salac-berry"},
+    {id:"baie-corn", nom:"Baie Cornèse",  e:"🍎",cat:"baie", desc:"Augmente Attaque sous 25% PV (tenu)",held:"liechi-berry"},
+    {id:"baie-nanca",nom:"Baie Nanca",    e:"🍈",cat:"baie", desc:"Augmente Atq. Spé. sous 25% PV (tenu)",held:"petaya-berry"},
+  ],
+};
 
-const shuffle=a=>{const r=[...a];for(let i=r.length-1;i>0;i--){const j=0|Math.random()*(i+1);[r[i],r[j]]=[r[j],r[i]];}return r;};
-const rng=n=>0|Math.random()*n;
-const cl=o=>JSON.parse(JSON.stringify(o));
-const calcStat=(b,hp,lv)=>lv===undefined?calcStat(b,hp,50):hp?(0|(2*b+31)*lv/100)+lv+10:(0|(2*b+31)*lv/100)+5;
+/* ═══════════════════════════════════════════════════
+   NŒUDS DE LA CARTE
+═══════════════════════════════════════════════════ */
+const NOEUDS=[
+  {id:"fin",  x:150,y:50,  type:"centre", zone:0,next:[]},
+  {id:"a1",   x:85, y:135, type:"elite",  zone:5,next:["fin"]},
+  {id:"a2",   x:215,y:135, type:"trainer",zone:5,next:["fin"]},
+  {id:"b1",   x:42, y:220, type:"mystere",zone:4,next:["a1"]},
+  {id:"b2",   x:150,y:220, type:"trainer",zone:4,next:["a1","a2"]},
+  {id:"b3",   x:258,y:220, type:"mystere",zone:4,next:["a2"]},
+  {id:"c1",   x:85, y:305, type:"trainer",zone:3,next:["b1","b2"]},
+  {id:"c2",   x:215,y:305, type:"mystere",zone:3,next:["b2","b3"]},
+  {id:"d1",   x:42, y:390, type:"mystere",zone:2,next:["c1"]},
+  {id:"d2",   x:150,y:390, type:"trainer",zone:2,next:["c1","c2"]},
+  {id:"d3",   x:258,y:390, type:"mystere",zone:2,next:["c2"]},
+  {id:"e1",   x:85, y:475, type:"trainer",zone:1,next:["d1","d2"]},
+  {id:"e2",   x:215,y:475, type:"trainer",zone:1,next:["d2","d3"]},
+  {id:"dep",  x:150,y:560, type:"depart", zone:0,next:["e1","e2"]},
+];
+const ZONE_LV={e1:12,e2:14,d1:22,d2:25,d3:22,c1:32,c2:35,b1:42,b2:45,b3:42,a1:55,a2:52};
+
+/* ═══════════════════════════════════════════════════
+   UTILITAIRES
+═══════════════════════════════════════════════════ */
+const mélange=a=>{const r=[...a];for(let i=r.length-1;i>0;i--){const j=0|Math.random()*(i+1);[r[i],r[j]]=[r[j],r[i]];}return r;};
+const alea=n=>0|Math.random()*n;
+const cop=o=>JSON.parse(JSON.stringify(o));
+const calcStat=(b,pv,lv)=>pv?(0|(2*b+31)*lv/100)+lv+10:(0|(2*b+31)*lv/100)+5;
 const bMul=b=>b>=0?(2+b)/2:2/(2-b);
 
-function effStat(pk,stat){
-  const b=pk.baseStats;
-  const base={attack:b.attack,defense:b.defense,specialAttack:b.specialAttack,specialDefense:b.specialDefense,speed:b.speed}[stat];
-  let v=0|calcStat(base,false,pk.level)*bMul(pk.boosts[stat]||0);
+function statEff(pk,stat){
+  const b=pk.stats,base={attack:b.attack,defense:b.defense,specialAttack:b.specialAttack,specialDefense:b.specialDefense,speed:b.speed}[stat];
+  let v=0|calcStat(base,false,pk.lv)*bMul(pk.boost[stat]||0);
   if(stat==="attack"&&pk.status==="brn")v=0|v*.5;
   if(stat==="speed"&&pk.status==="par")v=0|v*.5;
-  if(stat==="attack"&&pk.held==="choice-band")v=0|v*1.5;
-  if(stat==="specialAttack"&&pk.held==="choice-specs")v=0|v*1.5;
+  if(stat==="attack"&&pk.tenu==="choice-band")v=0|v*1.5;
+  if(stat==="specialAttack"&&pk.tenu==="choice-specs")v=0|v*1.5;
+  if(stat==="speed"&&pk.tenu==="choice-scarf")v=0|v*1.5;
+  if(stat==="specialDefense"&&pk.tenu==="assault-vest")v=0|v*1.5;
   return Math.max(1,v);
 }
+
 function calcDmg(atk,mv,def){
   if(!mv.p)return{d:0,eff:1,crit:false};
-  const eff=typeEff(mv.t,def.types);
-  if(eff===0)return{d:0,eff:0,crit:false};
-  const phy=mv.dc==="phy";
-  const a=effStat(atk,phy?"attack":"specialAttack"),d=effStat(def,phy?"defense":"specialDefense");
+  const eff=typeEff(mv.t,def.types);if(eff===0)return{d:0,eff:0,crit:false};
+  /* Air Balloon immunise contre Sol */
+  if(mv.t==="ground"&&def.tenu==="air-balloon")return{d:0,eff:0,crit:false,balloon:true};
+  const phy=mv.dc==="phy",a=statEff(atk,phy?"attack":"specialAttack"),d=statEff(def,phy?"defense":"specialDefense");
   let dm=(0|(0|(2*50/5+2)*mv.p*a/d)/50)+2;
-  if(atk.types.includes(mv.t))dm=0|dm*1.5;
-  dm=0|dm*eff;
-  if(atk.held==="life-orb")dm=0|dm*1.3;
-  const crit=Math.random()<(mv.crit?1/8:1/24);
-  if(crit)dm=0|dm*1.5;
-  return{d:Math.max(1,0|dm*((rng(16)+85)/100)),eff,crit};
-}
-function pickMove(en,pl){
-  const v=en.moves.filter(m=>m.pp>0);
-  if(!v.length)return{name:"struggle",p:50,t:"normal",dc:"phy",a:100,pp:1,maxPp:1,rcl:.25};
-  const s=v.map(m=>({m,s:m.p?(m.p*typeEff(m.t,pl.types)*(en.types.includes(m.t)?1.5:1)):((m.sta&&!pl.status)?40:3)}));
-  s.sort((a,b)=>b.s-a.s);
-  return Math.random()<.8?s[0].m:v[rng(v.length)];
-}
-async function fetchPoke(id,level){
-  level=level||50;
-  const r=await fetch("https://pokeapi.co/api/v2/pokemon/"+id);
-  const d=await r.json();
-  const types=d.types.map(t=>t.type.name);
-  const bs={hp:d.stats[0].base_stat,attack:d.stats[1].base_stat,defense:d.stats[2].base_stat,
-    specialAttack:d.stats[3].base_stat,specialDefense:d.stats[4].base_stat,speed:d.stats[5].base_stat};
-  const learned=new Set(d.moves.map(m=>m.move.name));
-  const matched=Object.entries(MOVES).filter(([n])=>learned.has(n)).map(([name,def])=>({name,...def,pp:def.pp,maxPp:def.pp}));
-  const stab=shuffle(matched.filter(m=>m.p>0&&types.includes(m.t)));
-  const other=shuffle(matched.filter(m=>m.p>0&&!types.includes(m.t)));
-  const sta=shuffle(matched.filter(m=>!m.p));
-  let sel=[...stab.slice(0,2),...other.slice(0,1),...sta.slice(0,1)];
-  const used=new Set(sel.map(m=>m.name));
-  [...stab,...other].filter(m=>!used.has(m.name)).forEach(m=>{if(sel.length<4)sel.push(m);});
-  if(!sel.length)sel.push({name:"tackle",...MOVES.tackle,pp:35,maxPp:35});
-  const artwork=(d.sprites.other&&d.sprites.other["official-artwork"])?d.sprites.other["official-artwork"].front_default:d.sprites.front_default;
-  return{id:d.id,name:d.name,sprite:d.sprites.front_default,artwork:artwork||d.sprites.front_default,
-    types,baseStats:bs,maxHp:calcStat(bs.hp,true,level),hp:calcStat(bs.hp,true,level),
-    moves:sel.slice(0,4),status:null,statusCnt:0,held:null,sashUsed:false,
-    boosts:{attack:0,defense:0,specialAttack:0,specialDefense:0,speed:0},level:level,fainted:false};
+  if(atk.types.includes(mv.t))dm=0|dm*1.5;dm=0|dm*eff;
+  if(atk.tenu==="life-orb")dm=0|dm*1.3;
+  if(atk.tenu==="expert-belt"&&eff>1)dm=0|dm*1.2;
+  if(phy&&atk.tenu==="muscle-band")dm=0|dm*1.1;
+  if(!phy&&atk.tenu==="wise-glasses")dm=0|dm*1.1;
+  const tauxCrit=mv.crit?1/4:(atk.tenu==="scope-lens"?1/8:1/24);
+  const crit=Math.random()<tauxCrit;if(crit)dm=0|dm*1.5;
+  return{d:Math.max(1,0|dm*((alea(16)+85)/100)),eff,crit};
 }
 
-function runStatus(pk,isEnemy){
-  const n=isEnemy?pk.name:"Your "+pk.name;
+function choisirCapIA(enn,jou){
+  const v=enn.caps.filter(c=>c.pp>0);
+  if(!v.length)return{nom:"Lutte",p:50,t:"normal",dc:"phy",a:100,pp:1,maxPp:1,rcl:.25};
+  const s=v.map(c=>({c,s:c.p?(c.p*typeEff(c.t,jou.types)*(enn.types.includes(c.t)?1.5:1)):((c.sta&&!jou.status)?40:3)}));
+  s.sort((a,b)=>b.s-a.s);return Math.random()<.8?s[0].c:v[alea(v.length)];
+}
+
+async function chargerPoke(id){
+  const r=await fetch("https://pokeapi.co/api/v2/pokemon/"+id);const d=await r.json();
+  const types=d.types.map(t=>t.type.name);
+  const st={hp:d.stats[0].base_stat,attack:d.stats[1].base_stat,defense:d.stats[2].base_stat,
+    specialAttack:d.stats[3].base_stat,specialDefense:d.stats[4].base_stat,speed:d.stats[5].base_stat};
+  const appris=new Set(d.moves.map(m=>m.move.name));
+  const matches=Object.entries(CAP).filter(([n])=>appris.has(n)).map(([nom,def])=>({nom,...def,pp:def.pp,maxPp:def.pp}));
+  const stab=mélange(matches.filter(m=>m.p>0&&types.includes(m.t)));
+  const autre=mélange(matches.filter(m=>m.p>0&&!types.includes(m.t)));
+  const sta=mélange(matches.filter(m=>!m.p));
+  let sel=[...stab.slice(0,2),...autre.slice(0,1),...sta.slice(0,1)];
+  const us=new Set(sel.map(m=>m.nom));
+  [...stab,...autre].filter(m=>!us.has(m.nom)).forEach(m=>{if(sel.length<4)sel.push(m);});
+  if(!sel.length)sel.push({nom:"tackle",...CAP.tackle,pp:35,maxPp:35});
+  const art=d.sprites.other?.["official-artwork"]?.front_default;
+  return{id:d.id,nom:d.name,sprite:d.sprites.front_default,art:art||d.sprites.front_default,
+    types,stats:st,caps:sel.slice(0,4),boost:{attack:0,defense:0,specialAttack:0,specialDefense:0,speed:0},
+    status:null,statusCnt:0,tenu:null,sashUsed:false,evanoui:false};
+}
+function mkEnnemi(base,lv){
+  return{...cop(base),lv,pvMax:calcStat(base.stats.hp,true,lv),pv:calcStat(base.stats.hp,true,lv),
+    caps:base.caps.map(c=>({...c,pp:c.maxPp||CAP[c.nom]?.pp||5}))};
+}
+function mkJoueur(base){
+  return{...cop(base),lv:50,pvMax:calcStat(base.stats.hp,true,50),pv:calcStat(base.stats.hp,true,50),
+    caps:base.caps.map(c=>({...c,pp:c.maxPp||CAP[c.nom]?.pp||5}))};
+}
+
+/* ═══════════════════════════════════════════════════
+   MOTEUR DE COMBAT
+═══════════════════════════════════════════════════ */
+const STATUS_BAIE={"cheri-berry":"par","chesto-berry":"slp","pecha-berry":"psn","rawst-berry":"brn","aspear-berry":"frz"};
+const BAIE_BOOST={"salac-berry":"speed","liechi-berry":"attack","petaya-berry":"specialAttack"};
+
+function verifierStatut(pk,estEnnemi){
+  const n=estEnnemi?pk.nom:"Votre "+pk.nom;
   if(!pk.status)return{ok:true,logs:[]};
-  if(pk.status==="slp"){
-    if(pk.statusCnt<=0){pk.status=null;return{ok:true,logs:[n+" woke up!"]};}
-    pk.statusCnt--;return{ok:false,logs:[n+" is fast asleep!"]};
-  }
-  if(pk.status==="frz"){
-    if(Math.random()<.2){pk.status=null;return{ok:true,logs:[n+" thawed out!"]};}
-    return{ok:false,logs:[n+" is frozen solid!"]};
-  }
-  if(pk.status==="par"&&Math.random()<.25)return{ok:false,logs:[n+" is paralyzed!"]};
+  if(pk.status==="slp"){if(pk.statusCnt<=0){pk.status=null;return{ok:true,logs:[n+" se réveille!"]};}pk.statusCnt--;return{ok:false,logs:[n+" est en plein sommeil!"]};}
+  if(pk.status==="frz"){if(Math.random()<.2){pk.status=null;return{ok:true,logs:[n+" se dégèle!"]};}return{ok:false,logs:[n+" est gelé!"]};}
+  if(pk.status==="par"&&Math.random()<.25)return{ok:false,logs:[n+" est paralysé!"]};
   return{ok:true,logs:[]};
 }
-function runEOT(pk,isEnemy){
-  const n=isEnemy?pk.name:"Your "+pk.name,logs=[];
-  if(pk.hp<=0)return logs;
-  if(pk.status==="brn"){const d=0|pk.maxHp/8;pk.hp=Math.max(0,pk.hp-d);logs.push(n+" is hurt by burn! (−"+d+")");}
-  else if(pk.status==="psn"){const d=0|pk.maxHp/8;pk.hp=Math.max(0,pk.hp-d);logs.push(n+" is hurt by poison! (−"+d+")");}
-  else if(pk.status==="bpsn"){pk.statusCnt=(pk.statusCnt||1)+1;const d=0|pk.maxHp*pk.statusCnt/16;pk.hp=Math.max(0,pk.hp-d);logs.push(n+" is badly poisoned! (−"+d+")");}
-  if(pk.held==="leftovers"&&pk.hp>0){const h=0|pk.maxHp/16;pk.hp=Math.min(pk.maxHp,pk.hp+h);logs.push(n+" recovered HP! (+"+h+")");}
-  if(pk.held==="sitrus-berry"&&pk.hp>0&&pk.hp<=pk.maxHp*.5){const h=0|pk.maxHp*.25;pk.hp=Math.min(pk.maxHp,pk.hp+h);pk.held=null;logs.push(n+"'s Sitrus Berry activated! (+"+h+")");}
+
+function finTour(pk,estEnnemi){
+  const n=estEnnemi?pk.nom:"Votre "+pk.nom,logs=[];if(pk.pv<=0)return logs;
+  if(pk.status==="brn"){const d=0|pk.pvMax/8;pk.pv=Math.max(0,pk.pv-d);logs.push(n+" souffre de sa brûlure! (−"+d+" PV)");}
+  else if(pk.status==="psn"){const d=0|pk.pvMax/8;pk.pv=Math.max(0,pk.pv-d);logs.push(n+" souffre du poison! (−"+d+" PV)");}
+  else if(pk.status==="bpsn"){pk.statusCnt=(pk.statusCnt||1)+1;const d=0|pk.pvMax*pk.statusCnt/16;pk.pv=Math.max(0,pk.pv-d);logs.push(n+" souffre du poison grave! (−"+d+" PV)");}
+  if(pk.tenu==="leftovers"&&pk.pv>0){const h=0|pk.pvMax/16;pk.pv=Math.min(pk.pvMax,pk.pv+h);logs.push(n+" récupère grâce aux Restes! (+"+h+" PV)");}
+  if(pk.tenu==="black-sludge"&&pk.pv>0){if(pk.types.includes("poison")){const h=0|pk.pvMax/16;pk.pv=Math.min(pk.pvMax,pk.pv+h);logs.push(n+" récupère grâce à la Gadoue Noire! (+"+h+" PV)");}else{const d=0|pk.pvMax/8;pk.pv=Math.max(0,pk.pv-d);logs.push(n+" est blessé par la Gadoue Noire! (−"+d+" PV)");}}
+  if(pk.tenu==="sitrus-berry"&&pk.pv>0&&pk.pv<=pk.pvMax*.5){const h=0|pk.pvMax*.25;pk.pv=Math.min(pk.pvMax,pk.pv+h);pk.tenu=null;logs.push(n+" mange sa Baie Sitrus! (+"+h+" PV)");}
+  /* Baies boost (sous 25% PV) */
+  if(pk.pv>0&&pk.pv<=pk.pvMax*.25&&pk.tenu&&BAIE_BOOST[pk.tenu]){
+    const stat=BAIE_BOOST[pk.tenu];pk.boost[stat]=(pk.boost[stat]||0)+1;
+    const nm=pk.tenu.replace("-berry","");pk.tenu=null;logs.push(n+" mange sa Baie! "+stat+" augmente!");
+  }
   return logs;
 }
-function runMove(atk,def,mv,atkIsEnemy){
-  const n=atkIsEnemy?atk.name:"Your "+atk.name,t=atkIsEnemy?"Your "+def.name:def.name;
-  const logs=[n+" used "+mv.name.replace(/-/g," ")+"!"];
-  if(mv.a!==999&&Math.random()*100>mv.a){if(mv.pp!==undefined)mv.pp=Math.max(0,mv.pp-1);logs.push("But it missed!");return logs;}
+
+function executerCap(atk,def,mv,atkEstEnn){
+  const n=atkEstEnn?atk.nom:"Votre "+atk.nom,t=atkEstEnn?"Votre "+def.nom:def.nom;
+  const logs=[n+" utilise "+mv.nom.replace(/-/g," ")+"!"];
+  if(mv.a!==999&&Math.random()*100>mv.a){if(mv.pp!==undefined)mv.pp=Math.max(0,mv.pp-1);logs.push("La capacité a échoué!");return logs;}
   if(mv.pp!==undefined)mv.pp=Math.max(0,mv.pp-1);
+  /* Capacité de statut */
   if(mv.dc==="sta"){
-    if(mv.sta){
-      if(def.status){logs.push(t+" already has a status!");}
-      else{
-        const imm=(mv.sta==="par"&&def.types.includes("electric"))||(mv.sta==="psn"&&(def.types.includes("poison")||def.types.includes("steel")))||(mv.sta==="brn"&&def.types.includes("fire"));
-        if(imm){logs.push("It doesn't affect "+t+"!");}
-        else{
-          def.status=mv.sta;def.statusCnt=(mv.sta==="slp")?1+rng(3):0;
-          if(def.held==="lum-berry"){def.status=null;def.held=null;logs.push(t+"'s Lum Berry cured it!");}
-          else{const lb={brn:"burned",par:"paralyzed",psn:"poisoned",bpsn:"badly poisoned",slp:"fell asleep",frz:"was frozen"};logs.push(t+" "+(lb[mv.sta]||mv.sta)+"!");}
-        }
+    if(mv.sta){if(def.status){logs.push(t+" a déjà un problème de statut!");}
+    else{const imm=(mv.sta==="par"&&def.types.includes("electric"))||(mv.sta==="psn"&&(def.types.includes("poison")||def.types.includes("steel")))||(mv.sta==="brn"&&def.types.includes("fire"));
+      if(imm)logs.push("Ça n'affecte pas "+t+"!");
+      else{def.status=mv.sta;def.statusCnt=mv.sta==="slp"?1+alea(3):0;
+        const sb=Object.entries(STATUS_BAIE).find(([b,s])=>def.tenu===b&&s===def.status);
+        if(sb){def.status=null;def.tenu=null;logs.push("La Baie de "+t+" soigne le statut!");}
+        else{const lb={brn:"brûlé",par:"paralysé",psn:"empoisonné",bpsn:"gravement empoisonné",slp:"endormi",frz:"gelé"};logs.push(t+" est "+lb[mv.sta]+"!");}
       }
-    }
-    return logs;
+    }return logs;}
   }
+  /* Attaque */
   const res=calcDmg(atk,mv,def);
-  if(res.crit)logs.push("A critical hit!");
-  if(res.eff===0){logs.push("No effect!");return logs;}
-  if(res.eff>=4)logs.push("Super effective!! (4x)");else if(res.eff>=2)logs.push("Super effective!");else if(res.eff<1)logs.push("Not very effective...");
-  if(def.held==="focus-sash"&&!def.sashUsed&&def.hp===def.maxHp&&res.d>=def.hp){def.hp=1;def.sashUsed=true;logs.push(t+" hung on with Focus Sash!");}
-  else{def.hp=Math.max(0,def.hp-res.d);logs.push(t+" took "+res.d+" damage!");}
+  if(res.balloon){def.tenu=null;logs.push(t+" est immunisé (Ballon Air crève)!");return logs;}
+  if(res.crit)logs.push("Coup critique!");
+  if(res.eff===0){logs.push("Ça n'affecte pas "+t+"!");return logs;}
+  if(res.eff>=4)logs.push("C'est super efficace!! (×4)");else if(res.eff>=2)logs.push("C'est super efficace!");else if(res.eff<1)logs.push("Ce n'est pas très efficace...");
+  /* Focus Sash */
+  if(def.tenu==="focus-sash"&&!def.sashUsed&&def.pv===def.pvMax&&res.d>=def.pv){def.pv=1;def.sashUsed=true;logs.push(t+" résiste grâce à la Ceinture Focus!");}
+  else{def.pv=Math.max(0,def.pv-res.d);logs.push(t+" perd "+res.d+" PV!");}
+  /* Air Balloon éclate si touché */
+  if(def.tenu==="air-balloon"&&res.d>0)def.tenu=null;
+  /* Effet secondaire statut */
   if(mv.eff&&mv.ec&&Math.random()*100<mv.ec&&!def.status){
     const imm=(mv.eff==="par"&&def.types.includes("electric"))||(mv.eff==="psn"&&(def.types.includes("poison")||def.types.includes("steel")))||(mv.eff==="brn"&&def.types.includes("fire"));
-    if(!imm){def.status=mv.eff;if(mv.eff==="slp")def.statusCnt=1+rng(3);
-      if(def.held==="lum-berry"){def.status=null;def.held=null;logs.push(t+"'s Lum Berry cured it!");}
-      else{const lb={brn:"burned",par:"paralyzed",psn:"poisoned",frz:"frozen"};if(lb[mv.eff])logs.push(t+" was "+lb[mv.eff]+"!");}}
+    if(!imm){def.status=mv.eff;if(mv.eff==="slp")def.statusCnt=1+alea(3);
+      const sb=Object.entries(STATUS_BAIE).find(([b,s])=>def.tenu===b&&s===def.status);
+      if(sb){def.status=null;def.tenu=null;logs.push("La Baie de "+t+" soigne le statut!");}
+      else{const lb={brn:"brûlé",par:"paralysé",psn:"empoisonné",frz:"gelé"};if(lb[mv.eff])logs.push(t+" est "+lb[mv.eff]+"!");}
+    }
   }
-  if(mv.rcl&&atk.hp>0){const r=Math.max(1,0|res.d*mv.rcl);atk.hp=Math.max(0,atk.hp-r);logs.push(n+" took "+r+" recoil!");}
-  if(atk.held==="life-orb"&&atk.hp>0){const r=Math.max(1,0|atk.maxHp*.1);atk.hp=Math.max(0,atk.hp-r);logs.push("Life Orb recoil! (−"+r+")");}
+  /* Recul */
+  if(mv.rcl&&atk.pv>0){const r=Math.max(1,0|res.d*mv.rcl);atk.pv=Math.max(0,atk.pv-r);logs.push(n+" subit "+r+" PV de recul!");}
+  if(atk.tenu==="life-orb"&&atk.pv>0){const r=Math.max(1,0|atk.pvMax*.1);atk.pv=Math.max(0,atk.pv-r);logs.push("Recul de l'Orbe Vie! (−"+r+" PV)");}
+  /* Rocky Helmet */
+  if(def.tenu==="rocky-helmet"&&mv.dc==="phy"&&atk.pv>0){const r=Math.max(1,0|def.pvMax/6);atk.pv=Math.max(0,atk.pv-r);logs.push(n+" est blessé par le Casque Rocher! (−"+r+" PV)");}
+  /* Shell Bell */
+  if(atk.tenu==="shell-bell"&&res.d>0&&atk.pv>0){const h=Math.max(1,0|res.d/8);atk.pv=Math.min(atk.pvMax,atk.pv+h);logs.push(n+" récupère grâce à la Sonnaille! (+"+h+" PV)");}
+  /* Baies statut activées au contact */
+  const sb2=Object.entries(STATUS_BAIE).find(([b,s])=>def.tenu===b&&def.status===s);
+  if(sb2){def.status=null;def.tenu=null;logs.push("La Baie de "+t+" soigne son statut!");}
   return logs;
 }
-function resolveTurn(player,enemy,mi){
-  const p=cl(player),e=cl(enemy),logs=[];
-  const pm=p.moves[mi],em=pickMove(e,p);
-  const pS=effStat(p,"speed"),eS=effStat(e,"speed");
-  const pPri=pm&&pm.pri||0,ePri=em.pri||0;
-  const pFirst=pPri>ePri||(pPri===ePri&&(pS>eS||(pS===eS&&Math.random()<.5)));
-  function go(a1,d1,mv1,a1e,a2,d2,mv2,a2e){
-    const r1=runStatus(a1,a1e);logs.push(...r1.logs);
-    if(r1.ok)logs.push(...runMove(a1,d1,mv1,a1e));
-    if(d1.hp<=0)return true;
-    const r2=runStatus(a2,a2e);logs.push(...r2.logs);
-    if(r2.ok)logs.push(...runMove(a2,d2,mv2,a2e));
+
+function résoudreT(joueur,ennemi,mi){
+  const j=cop(joueur),e=cop(ennemi),logs=[];
+  const jm=j.caps[mi],em=choisirCapIA(e,j);
+  const jVit=statEff(j,"speed"),eVit=statEff(e,"speed");
+  const jPri=(jm&&jm.pri)||0,ePri=em.pri||0;
+  /* Quick Claw */
+  const jQuick=j.tenu==="quick-claw"&&Math.random()<.2;
+  const eQuick=e.tenu==="quick-claw"&&Math.random()<.2;
+  const jFirst=jQuick||((!eQuick)&&(jPri>ePri||(jPri===ePri&&(jVit>eVit||(jVit===eVit&&Math.random()<.5)))));
+  function aller(a1,d1,mv1,a1e,a2,d2,mv2,a2e){
+    const r1=verifierStatut(a1,a1e);logs.push(...r1.logs);if(r1.ok)logs.push(...executerCap(a1,d1,mv1,a1e));
+    if(d1.pv<=0)return true;
+    const r2=verifierStatut(a2,a2e);logs.push(...r2.logs);if(r2.ok)logs.push(...executerCap(a2,d2,mv2,a2e));
     return false;
   }
-  const early=pFirst?go(p,e,pm,false,e,p,em,true):go(e,p,em,true,p,e,pm,false);
-  if(!early){logs.push(...runEOT(p,false));logs.push(...runEOT(e,true));}
-  if(p.hp<=0){p.hp=0;p.fainted=true;logs.push("Your "+p.name+" fainted!");}
-  if(e.hp<=0){e.hp=0;logs.push(e.name+" fainted!");}
-  return{logs,p,e,pFainted:p.fainted,eFainted:e.hp<=0};
+  const tôt=jFirst?aller(j,e,jm,false,e,j,em,true):aller(e,j,em,true,j,e,jm,false);
+  if(!tôt){logs.push(...finTour(j,false));logs.push(...finTour(e,true));}
+  if(j.pv<=0){j.pv=0;j.evanoui=true;logs.push("Votre "+j.nom+" est K.O.!");}
+  if(e.pv<=0){e.pv=0;logs.push(e.nom+" est K.O.!");}
+  return{logs,j,e,jKO:j.evanoui,eKO:e.pv<=0};
 }
 
-function HPBar(props){
-  const pct=props.max>0?Math.max(0,props.cur/props.max*100):0;
-  const col=pct>50?"#4ade80":pct>20?"#facc15":"#f87171";
-  return React.createElement("div",{style:{background:"#1a1a30",borderRadius:6,overflow:"hidden",height:props.lg?14:10,border:"1px solid #2d2d50"}},
-    React.createElement("div",{style:{width:pct+"%",height:"100%",background:col,transition:"width .4s, background-color .4s"}}));
+/* ═══════════════════════════════════════════════════
+   COMPOSANTS UI
+═══════════════════════════════════════════════════ */
+function BarrePV({cur,max,grand}){
+  const pct=max>0?Math.max(0,cur/max*100):0;
+  const col=pct>50?"#40e040":pct>20?"#e8e040":"#e84040";
+  const ombre=pct>50?"0 0 8px #40e04066":pct>20?"0 0 8px #e8e04066":"0 0 8px #e8404066";
+  return React.createElement("div",{style:{background:"#0a0a18",borderRadius:4,overflow:"hidden",height:grand?12:7,border:"1px solid #1c1c30"}},
+    React.createElement("div",{style:{width:pct+"%",height:"100%",background:col,transition:"width .4s,background .4s",boxShadow:ombre}}));
 }
-function TBadge(props){
-  return React.createElement("span",{style:{background:TC2[props.type]||"#777",color:"#fff",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:12,textTransform:"uppercase",letterSpacing:.5}},props.type);
-}
-function SBadge(props){
-  if(!props.status)return null;
-  const m={brn:{c:"#e17055",l:"BRN"},par:{c:"#fdcb6e",l:"PAR"},psn:{c:"#a29bfe",l:"PSN"},bpsn:{c:"#6c5ce7",l:"PSN!"},slp:{c:"#74b9ff",l:"SLP"},frz:{c:"#00cec9",l:"FRZ"}};
-  const dk=m[props.status];if(!dk)return null;
-  return React.createElement("span",{style:{background:dk.c,color:"#fff",fontSize:9,fontWeight:800,padding:"2px 6px",borderRadius:10}},dk.l);
+function BTyp({type}){return React.createElement("span",{style:{background:TCOL[type]||"#555",color:"#fff",fontSize:7,fontWeight:700,padding:"2px 6px",borderRadius:10,textTransform:"uppercase",letterSpacing:.5,whiteSpace:"nowrap"}},(TNOM[type]||type).toUpperCase());}
+function BStatut({status}){
+  const m={brn:{c:"#e17055",l:"BRL"},par:{c:"#fdcb6e",l:"PAR"},psn:{c:"#a29bfe",l:"PSN"},bpsn:{c:"#6c5ce7",l:"PSN!"},slp:{c:"#74b9ff",l:"SOM"},frz:{c:"#00cec9",l:"GEL"}};
+  const d=status&&m[status];if(!d)return null;
+  return React.createElement("span",{style:{background:d.c,color:"#fff",fontSize:7,fontWeight:800,padding:"2px 5px",borderRadius:8}},d.l);
 }
 
-function App(){
-  const[screen,setScreen]=useState("loading");
-  const[loadPct,setLoadPct]=useState(0);
-  const[team,setTeam]=useState([]);
-  const[activeIdx,setActiveIdx]=useState(0);
-  const[inventory,setInventory]=useState([]);
-  const[arena,setArena]=useState(1);
-  const[draftPicks,setDraftPicks]=useState([]);
-  const[draftType,setDraftType]=useState("pokemon");
-  const[enemy,setEnemy]=useState(null);
-  const[log,setLog]=useState([]);
-  const[phase,setPhase]=useState("choose");
-  const[showBag,setShowBag]=useState(false);
-  const[showSwitch,setShowSwitch]=useState(false);
-  const[needSwitch,setNeedSwitch]=useState(false);
-  const poolRef=useRef([]);
-  const logRef=useRef(null);
-
-  useEffect(()=>{
-    (async()=>{
-      const ids=shuffle(Array.from({length:1010},function(_,i){return i+1;})).slice(0,32);
-      const loaded=[];
-      for(let i=0;i<32;i++){
-        try{const p=await fetchPoke(ids[i],50);loaded.push(p);setLoadPct(0|((i+1)/32*100));}catch(err){}
-      }
-      poolRef.current=loaded;
-      initDraft([],loaded,"pokemon");
-    })();
-  },[]);
-
-  useEffect(()=>{if(logRef.current)logRef.current.scrollTop=logRef.current.scrollHeight;},[log]);
-
-  function initDraft(curTeam,curPool,type){
-    const tids=new Set(curTeam.map(function(t){return t.id;}));
-    if(type==="pokemon"&&curTeam.length<6){
-      const opts=shuffle(curPool.filter(function(p){return !tids.has(p.id);})).slice(0,3);
-      setDraftPicks(opts.map(function(p){return cl(p);}));setDraftType("pokemon");
-    }else{setDraftPicks(shuffle(ITEMS_POOL).slice(0,3));setDraftType("item");}
-    setTeam(curTeam);setScreen("draft");
-  }
-
-  function launchBattle(curTeam,curArena){
-    if(!curTeam.filter(function(p){return !p.fainted;}).length){setScreen("gameover");return;}
-    const lv=Math.min(80,10+curArena*5);
-    const tids=new Set(curTeam.map(function(t){return t.id;}));
-    const avail=poolRef.current.filter(function(p){return !tids.has(p.id);});
-    if(!avail.length){setScreen("victory");return;}
-    const base=cl(shuffle(avail)[0]);
-    const foe=Object.assign({},base,{level:lv,maxHp:calcStat(base.baseStats.hp,true,lv),hp:calcStat(base.baseStats.hp,true,lv),
-      moves:base.moves.map(function(m){return Object.assign({},m,{pp:m.maxPp||(MOVES[m.name]&&MOVES[m.name].pp)||5,maxPp:m.maxPp||(MOVES[m.name]&&MOVES[m.name].pp)||5});})});
-    setEnemy(foe);setLog(["⚔️ Arena "+curArena+" — "+foe.name+" appeared! (Lv."+lv+")"]);
-    setPhase("choose");setShowBag(false);setShowSwitch(false);setNeedSwitch(false);
-    setActiveIdx(curTeam.findIndex(function(p){return !p.fainted;}));setScreen("battle");
-  }
-
-  function onDraftPick(idx){
-    if(draftType==="pokemon"){
-      const picked=Object.assign({},cl(draftPicks[idx]),{hp:draftPicks[idx].maxHp,fainted:false});
-      const nt=team.concat([picked]);setTeam(nt);launchBattle(nt,arena);
-    }else{
-      setInventory(function(prev){return prev.concat([draftPicks[idx]]);});launchBattle(team,arena);
-    }
-  }
-
-  function onMove(mi){
-    if(phase!=="choose")return;
-    setPhase("busy");
-    const t=cl(team);const p=t[activeIdx];const e=cl(enemy);
-    const res=resolveTurn(p,e,mi);
-    t[activeIdx]=res.p;setLog(function(prev){return prev.concat(res.logs);});setTeam(t);
-    if(res.eFainted){
-      setEnemy(Object.assign({},res.e,{hp:0}));setLog(function(prev){return prev.concat(["🏆 Arena "+arena+" cleared!"]);});
-      setTimeout(function(){const na=arena+1;setArena(na);if(na>20){setScreen("victory");return;}initDraft(t,poolRef.current,Math.random()<.6?"pokemon":"item");},1800);
-    }else if(res.pFainted){
-      setEnemy(res.e);
-      if(!t.filter(function(pk){return !pk.fainted;}).length){setLog(function(prev){return prev.concat(["💀 All Pokémon fainted..."]);});setTimeout(function(){setScreen("gameover");},1400);}
-      else{setNeedSwitch(true);setShowSwitch(true);setPhase("switch");}
-    }else{setEnemy(res.e);setPhase("choose");}
-  }
-
-  function onSwitch(idx){
-    if(team[idx].fainted||idx===activeIdx)return;
-    setActiveIdx(idx);setShowSwitch(false);
-    if(needSwitch){setNeedSwitch(false);setPhase("choose");return;}
-    setPhase("busy");
-    const t=cl(team);const p=t[idx];const e=cl(enemy);
-    const em=pickMove(e,p);const logs=["You switched to "+p.name+"!"];
-    const sr=runStatus(e,true);logs.push(...sr.logs);
-    if(sr.ok)logs.push(...runMove(e,p,em,true));
-    logs.push(...runEOT(p,false));logs.push(...runEOT(e,true));
-    if(p.hp<=0){p.fainted=true;logs.push("Your "+p.name+" fainted!");}
-    if(e.hp<=0)logs.push(e.name+" fainted!");
-    t[idx]=p;setLog(function(prev){return prev.concat(logs);});setTeam(t);setEnemy(e);
-    if(e.hp<=0){
-      setLog(function(prev){return prev.concat(["🏆 Arena "+arena+" cleared!"]);});
-      setTimeout(function(){const na=arena+1;setArena(na);if(na>20){setScreen("victory");return;}initDraft(t,poolRef.current,Math.random()<.6?"pokemon":"item");},1800);
-    }else if(p.hp<=0){
-      if(!t.filter(function(pk){return !pk.fainted;}).length)setTimeout(function(){setScreen("gameover");},1200);
-      else{setNeedSwitch(true);setShowSwitch(true);setPhase("switch");}
-    }else setPhase("choose");
-  }
-
-  function onUseItem(item,tIdx){
-    const t=cl(team);const pk=t[tIdx];
-    const ic=inventory.slice();const ri=ic.findIndex(function(i){return i.id===item.id;});if(ri!==-1)ic.splice(ri,1);
-    const logs=[];
-    if(item.heal){const h=Math.min(item.heal,pk.maxHp-pk.hp);pk.hp=Math.min(pk.maxHp,pk.hp+item.heal);logs.push("Used "+item.name+"! +"+h+" HP to "+pk.name);}
-    if(item.healFull){pk.hp=pk.maxHp;if(item.cure){pk.status=null;pk.statusCnt=0;}logs.push("Used "+item.name+" on "+pk.name+"! Fully restored!");}
-    if(item.revive&&pk.fainted){pk.hp=0|pk.maxHp/2;pk.fainted=false;logs.push("Revived "+pk.name+"! ("+pk.hp+" HP)");}
-    if(item.boost)Object.entries(item.boost).forEach(function(e){pk.boosts[e[0]]=(pk.boosts[e[0]]||0)+e[1];logs.push(pk.name+"'s "+e[0]+" rose sharply!");});
-    if(item.held){pk.held=item.held;logs.push(pk.name+" is holding "+item.name+"!");}
-    t[tIdx]=pk;setTeam(t);setInventory(ic);setLog(function(prev){return prev.concat(logs);});setShowBag(false);
-    if(screen==="battle"&&phase==="choose"){
-      setPhase("busy");const e=cl(enemy);const pl=t[activeIdx];
-      const em=pickMove(e,pl);const el=[];
-      const sr=runStatus(e,true);el.push(...sr.logs);if(sr.ok)el.push(...runMove(e,pl,em,true));
-      el.push(...runEOT(pl,false));el.push(...runEOT(e,true));
-      if(pl.hp<=0){pl.fainted=true;el.push("Your "+pl.name+" fainted!");}
-      if(e.hp<=0)el.push(e.name+" fainted!");
-      t[activeIdx]=pl;setTeam(t);setEnemy(e);setLog(function(prev){return prev.concat(el);});
-      if(e.hp<=0){setLog(function(prev){return prev.concat(["🏆 Arena "+arena+" cleared!"]);});setTimeout(function(){const na=arena+1;setArena(na);if(na>20){setScreen("victory");return;}initDraft(t,poolRef.current,Math.random()<.6?"pokemon":"item");},1800);}
-      else if(pl.hp<=0){if(!t.filter(function(pk){return !pk.fainted;}).length)setTimeout(function(){setScreen("gameover");},1200);else{setNeedSwitch(true);setShowSwitch(true);setPhase("switch");}}
-      else setPhase("choose");
-    }
-  }
-
-  const BG="#09091a";
-  const CARD={background:"#13132b",border:"1px solid #2a2a50",borderRadius:14,padding:14,boxShadow:"0 4px 20px rgba(0,0,0,.5)"};
-  function BTN(c){return{padding:"9px 14px",background:"transparent",border:"2px solid "+(c||"#7c3aed"),borderRadius:9,color:c||"#7c3aed",fontWeight:700,cursor:"pointer",fontSize:13};}
-
-  if(screen==="loading")return(
-    <div style={{minHeight:"100vh",background:BG,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui,sans-serif"}}>
-      <div style={{textAlign:"center",maxWidth:300,color:"#e0e0f0"}}>
-        <div style={{fontSize:54,marginBottom:12}}>⚡</div>
-        <div style={{fontSize:22,fontWeight:900,color:"#a78bfa",letterSpacing:3,marginBottom:6}}>POKELIKE</div>
-        <div style={{color:"#555",fontSize:12,marginBottom:22}}>Loading Pokémon data…</div>
-        <div style={{background:"#1a1a30",borderRadius:8,overflow:"hidden",height:8,marginBottom:8}}>
-          <div style={{width:loadPct+"%",height:"100%",background:"linear-gradient(90deg,#7c3aed,#a78bfa)",transition:"width .3s",borderRadius:8}}/>
-        </div>
-        <div style={{color:"#444",fontSize:11}}>{loadPct}%</div>
-      </div>
-    </div>
+/* ═══════════════════════════════════════════════════
+   CARTE SVG
+═══════════════════════════════════════════════════ */
+const CARTE_W=300,CARTE_H=640;
+function CarteSVG({genCol}){
+  const zones=[
+    {y:438,h:132,c:"#78c850"},{y:350,h:92,c:"#60b040"},{y:264,h:88,c:"#3a7828"},
+    {y:178,h:88,c:"#284820"},{y:92,h:88,c:"#1a2c14"},
+  ];
+  const arb=[[22,95],[22,188],[22,278],[22,368],[22,458],[22,548],[278,88],[278,180],[278,272],[278,362],[278,452],[278,542]];
+  return React.createElement("svg",{width:CARTE_W,height:CARTE_H,style:{position:"absolute",top:0,left:0}},
+    React.createElement("rect",{width:CARTE_W,height:CARTE_H,fill:"#78c850"}),
+    ...zones.map((z,i)=>React.createElement("rect",{key:"z"+i,x:18,y:z.y,width:264,height:z.h,fill:z.c})),
+    React.createElement("rect",{x:0,y:0,width:18,height:CARTE_H,fill:"#50c8e8"}),
+    React.createElement("rect",{x:282,y:0,width:18,height:CARTE_H,fill:"#50c8e8"}),
+    /* Centre Pokémon */
+    React.createElement("rect",{x:90,y:14,width:120,height:52,fill:"#68c8c8"}),
+    React.createElement("rect",{x:90,y:10,width:120,height:6,fill:"#e84848"}),
+    React.createElement("rect",{x:90,y:8,width:120,height:4,fill:"#50a8a8"}),
+    React.createElement("rect",{x:124,y:40,width:26,height:28,fill:"#2858d0"}),
+    React.createElement("rect",{x:96,y:22,width:22,height:14,fill:"#c0f0f8"}),
+    React.createElement("rect",{x:182,y:22,width:22,height:14,fill:"#c0f0f8"}),
+    React.createElement("rect",{x:128,y:64,width:44,height:5,fill:"#9090a8"}),
+    React.createElement("rect",{x:132,y:68,width:36,height:5,fill:"#808098"}),
+    /* Arbres */
+    ...arb.map(([tx,ty],i)=>React.createElement("g",{key:"a"+i,transform:"translate("+tx+","+ty+")"},
+      React.createElement("rect",{x:-2,y:5,width:4,height:9,fill:"#402810"}),
+      React.createElement("rect",{x:-8,y:-2,width:16,height:10,fill:"#206018"}),
+      React.createElement("rect",{x:-6,y:-9,width:12,height:9,fill:"#288028"}),
+      React.createElement("rect",{x:-3,y:-14,width:6,height:7,fill:"#38a030"}),
+    )),
+    /* Chemins pointillés */
+    ...NOEUDS.flatMap(n=>n.next.map(tid=>{
+      const tg=NOEUDS.find(x=>x.id===tid);if(!tg)return null;
+      return React.createElement("line",{key:n.id+"-"+tid,x1:n.x,y1:n.y,x2:tg.x,y2:tg.y,stroke:"#b0e870",strokeWidth:2.5,strokeDasharray:"6,5",opacity:.85});
+    })),
+    /* Pokéballs */
+    ...[{x:58,y:158},{x:238,y:248},{x:58,y:338},{x:244,y:458}].map(({x,y},i)=>
+      React.createElement("g",{key:"pb"+i,transform:"translate("+x+","+y+")"},
+        React.createElement("circle",{cx:0,cy:0,r:5,fill:"#e84040"}),
+        React.createElement("line",{x1:-5,y1:0,x2:5,y2:0,stroke:"#202020",strokeWidth:1.5}),
+        React.createElement("circle",{cx:0,cy:0,r:5,fill:"none",stroke:"#202020",strokeWidth:1}),
+        React.createElement("circle",{cx:0,cy:0,r:1.5,fill:"#f0f0f0"}),
+      )
+    ),
   );
+}
 
-  if(screen==="draft")return(
-    <div style={{minHeight:"100vh",background:BG,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:20,padding:16,fontFamily:"system-ui,sans-serif",color:"#e0e0f0"}}>
-      <div style={{textAlign:"center"}}>
-        <div style={{fontSize:10,fontWeight:900,color:"#a78bfa",letterSpacing:4,marginBottom:4}}>ARENA {arena}</div>
-        <div style={{fontSize:22,fontWeight:900}}>{draftType==="pokemon"?(team.length===0?"✨ Choose your starter":"➕ Add to your team"):"🎁 Choose a reward"}</div>
-        {team.length>0&&<div style={{fontSize:12,color:"#555",marginTop:4}}>Team: {team.filter(p=>!p.fainted).length}/{team.length} active</div>}
-      </div>
-      <div style={{display:"flex",gap:14,flexWrap:"wrap",justifyContent:"center",maxWidth:840}}>
-        {draftType==="pokemon"?draftPicks.map((p,i)=>(
-          <div key={i} onClick={()=>onDraftPick(i)}
-            style={{...CARD,cursor:"pointer",width:228,textAlign:"center",transition:"transform .2s,box-shadow .2s"}}
-            onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-6px)";e.currentTarget.style.boxShadow="0 14px 40px rgba(167,139,250,.3)";}}
-            onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=CARD.boxShadow;}}>
-            <div style={{display:"flex",justifyContent:"center",gap:4,marginBottom:8,flexWrap:"wrap"}}>{p.types.map(t=><TBadge key={t} type={t}/>)}</div>
-            <img src={p.artwork||p.sprite} alt={p.name} style={{width:110,height:110,imageRendering:"pixelated",objectFit:"contain"}}/>
-            <div style={{fontWeight:800,fontSize:16,textTransform:"capitalize",margin:"8px 0"}}>{p.name}</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3,fontSize:11,marginBottom:10}}>
-              {[["HP",p.baseStats.hp],["ATK",p.baseStats.attack],["DEF",p.baseStats.defense],["SATK",p.baseStats.specialAttack],["SDEF",p.baseStats.specialDefense],["SPD",p.baseStats.speed]].map(([k,v])=>(
-                <div key={k} style={{background:"#1a1a3c",borderRadius:4,padding:"3px 6px",display:"flex",justifyContent:"space-between"}}>
-                  <span style={{color:"#a78bfa",fontWeight:700}}>{k}</span><span>{v}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{borderTop:"1px solid #2a2a50",paddingTop:7,display:"flex",flexWrap:"wrap",gap:3,justifyContent:"center"}}>
-              {p.moves.map((m,j)=>(
-                <span key={j} style={{background:(TC2[m.t]||"#555")+"22",border:"1px solid "+(TC2[m.t]||"#555"),color:TC2[m.t]||"#aaa",borderRadius:8,padding:"2px 7px",fontSize:9,textTransform:"capitalize"}}>{m.name.replace(/-/g," ")}</span>
-              ))}
+/* ═══════════════════════════════════════════════════
+   APPLICATION PRINCIPALE
+═══════════════════════════════════════════════════ */
+function App(){
+  const[ecran,setEcran]=useState("genSelect");
+  const[genSel,setGenSel]=useState(null);
+  const[chargPct,setChargPct]=useState(0);
+  const[chargMsg,setChargMsg]=useState("");
+  const[equipe,setEquipe]=useState([]);
+  const[idxActif,setIdxActif]=useState(0);
+  const[inventaire,setInventaire]=useState([]);
+  const[médailles,setMédailles]=useState(0);
+  /* Carte */
+  const[effacés,setEffacés]=useState(new Set(["dep"]));
+  const[disponibles,setDisponibles]=useState(["e1","e2"]);
+  const[posActuelle,setPosActuelle]=useState("dep");
+  const[ennemisNœud,setEnnemisNœud]=useState({});
+  const[révélés,setRévélés]=useState({});
+  const[nœudEnAttente,setNœudEnAttente]=useState(null);
+  const[msgCarte,setMsgCarte]=useState("");
+  /* Combat */
+  const[ennemi,setEnnemi]=useState(null);
+  const[journal,setJournal]=useState([]);
+  const[phase,setPhase]=useState("choisir");
+  const[voirSac,setVoirSac]=useState(false);
+  const[voirÉchange,setVoirÉchange]=useState(false);
+  const[besoinÉchange,setBesoinÉchange]=useState(false);
+  /* Brouillon */
+  const[propsStar,setPropsStar]=useState([]);
+  const[propsDraft,setPropsDraft]=useState([]);
+  const[typeDraft,setTypeDraft]=useState("starter");
+  const[zoneDraft,setZoneDraft]=useState(1);
+  const tousPoké=useRef({});
+  const réserveRef=useRef({});
+  const jRef=useRef(null);
+
+  useEffect(()=>{if(jRef.current)jRef.current.scrollTop=jRef.current.scrollHeight;},[journal]);
+
+  /* ── CHARGEMENT ── */
+  async function démarrerChargement(numGen){
+    setGenSel(numGen);setEcran("chargement");
+    const gd=GENS[numGen];
+    /* Starters */
+    const idsStart=gd.st;
+    /* Ennemis de chaque nœud : piocher dans la bonne zone du bon pool */
+    const nœudIds={};
+    NOEUDS.filter(n=>n.zone>0).forEach(n=>{
+      const pool=gd["z"+n.zone];const deja=Object.values(nœudIds);
+      const dispo=pool.filter(id=>!deja.includes(id));
+      nœudIds[n.id]=dispo.length?mélange(dispo)[0]:mélange(pool)[0];
+    });
+    /* Réserve de draft : 3 extra par zone */
+    const draftIds={};
+    for(let z=1;z<=5;z++){
+      const utilisés=Object.entries(nœudIds).filter(([nid])=>{const nd=NOEUDS.find(x=>x.id===nid);return nd&&nd.zone===z;}).map(([,id])=>id);
+      const pool=gd["z"+z].filter(id=>!utilisés.includes(id));
+      draftIds[z]=mélange(pool).slice(0,4);
+    }
+    /* IDs uniques à charger */
+    const tousIds=[...new Set([...idsStart,...Object.values(nœudIds),...Object.values(draftIds).flat()])];
+    const total=tousIds.length;
+    const BATCH=6;
+    for(let i=0;i<tousIds.length;i+=BATCH){
+      const bat=tousIds.slice(i,i+BATCH);
+      setChargMsg("Chargement des Pokémon... ("+Math.min(i+BATCH,total)+"/"+total+")");
+      const res=await Promise.allSettled(bat.map(id=>chargerPoke(id)));
+      res.forEach((r,j)=>{if(r.status==="fulfilled")tousPoké.current[bat[j]]=r.value;});
+      setChargPct(0|((i+BATCH)/total*100));
+    }
+    /* Construire réserve par zone */
+    for(let z=1;z<=5;z++){réserveRef.current[z]=draftIds[z].map(id=>tousPoké.current[id]).filter(Boolean);}
+    /* Assigner ennemis aux nœuds */
+    const assignments={};
+    NOEUDS.filter(n=>n.zone>0).forEach(n=>{
+      const base=tousPoké.current[nœudIds[n.id]];
+      if(base)assignments[n.id]=mkEnnemi(base,ZONE_LV[n.id]||30);
+    });
+    setEnnemisNœud(assignments);
+    /* Starters */
+    setPropsStar(idsStart.map(id=>tousPoké.current[id]).filter(Boolean));
+    setTypeDraft("starter");setEcran("draft");
+  }
+
+  /* ── CLIC NŒUD ── */
+  function clicNœud(nœudId){
+    const nœud=NOEUDS.find(n=>n.id===nœudId);
+    if(!nœud||!disponibles.includes(nœudId))return;
+    if(nœudId==="fin"){
+      setEquipe(prev=>prev.map(p=>({...p,pv:p.pvMax,status:null,statusCnt:0,evanoui:false})));
+      const nc=new Set([...effacés,nœudId]);setEffacés(nc);setPosActuelle(nœudId);setDisponibles([]);
+      setMsgCarte("✨ Votre équipe a été entièrement soignée au Centre Pokémon!");
+      setTimeout(()=>setEcran("victoire"),800);return;
+    }
+    let typeN=nœud.type;const rev=révélés[nœudId];
+    if(nœud.type==="mystere"&&!rev){
+      const r=Math.random();typeN=r<.55?"trainer":r<.78?"objet":"soin";
+      setRévélés(prev=>({...prev,[nœudId]:typeN}));
+    }else if(rev)typeN=rev;
+
+    if(typeN==="soin"){
+      setEquipe(prev=>prev.map(p=>({...p,pv:p.pvMax,status:null,statusCnt:0,evanoui:false})));
+      const nc=new Set([...effacés,nœudId]);setEffacés(nc);setPosActuelle(nœudId);
+      setDisponibles(nœud.next.filter(id=>!nc.has(id)));
+      setMsgCarte("💚 Une source guérisseuse! Votre équipe a récupéré!");return;
+    }
+    if(typeN==="objet"){
+      const pool=OBJETS_PAR_ZONE[nœud.zone]||OBJETS_PAR_ZONE[1];
+      const obj=mélange(pool)[0];setInventaire(prev=>[...prev,obj]);
+      const nc=new Set([...effacés,nœudId]);setEffacés(nc);setPosActuelle(nœudId);
+      setDisponibles(nœud.next.filter(id=>!nc.has(id)));
+      setMsgCarte(obj.e+" Trouvé : "+obj.nom+"!");return;
+    }
+    /* Combat */
+    let adv=ennemisNœud[nœudId];
+    if(!adv){
+      const gd=GENS[genSel];const pool=(gd["z"+nœud.zone]||gd.z1);
+      const tids=new Set(equipe.map(t=>t.id));
+      const dispo=pool.filter(id=>!tids.has(id));
+      const baseId=mélange(dispo)[0]||mélange(pool)[0];
+      const base=tousPoké.current[baseId];if(!base)return;
+      adv=mkEnnemi(base,ZONE_LV[nœudId]||30);
+      setEnnemisNœud(prev=>({...prev,[nœudId]:adv}));
+    }
+    setNœudEnAttente(nœudId);setEnnemi(adv);
+    setJournal(["⚔️ "+GENS[genSel].reg+" — "+adv.nom+" apparaît! (Niv."+adv.lv+")"]);
+    setPhase("choisir");setVoirSac(false);setVoirÉchange(false);setBesoinÉchange(false);
+    setIdxActif(equipe.findIndex(p=>!p.evanoui));setEcran("combat");
+  }
+
+  /* ── VICTOIRE COMBAT ── */
+  function aprèsVictoire(éqActuelle,nœudId){
+    const nœud=NOEUDS.find(n=>n.id===nœudId);
+    const nc=new Set([...effacés,nœudId]);setEffacés(nc);setPosActuelle(nœudId);
+    setDisponibles(nœud.next.filter(id=>!nc.has(id)));
+    if(nœud.type==="elite")setMédailles(prev=>prev+1);
+    const zone=nœud.zone;
+    const tids=new Set(éqActuelle.map(t=>t.id));
+    const réserve=(réserveRef.current[zone]||[]).filter(p=>!tids.has(p.id));
+    if(éqActuelle.length<6&&réserve.length>=2&&Math.random()<.55){
+      setPropsDraft(réserve.slice(0,3));setTypeDraft("pokémon");setZoneDraft(zone);
+    }else{
+      const pool=OBJETS_PAR_ZONE[Math.min(zone+1,5)]||OBJETS_PAR_ZONE[5];
+      setPropsDraft(mélange(pool).slice(0,3));setTypeDraft("objet");
+    }
+    setEcran("draft");
+  }
+
+  /* ── COMBAT : CAPACITÉ ── */
+  function choisirCap(mi){
+    if(phase!=="choisir")return;setPhase("occupé");
+    const éq=cop(equipe);const j=éq[idxActif];const e=cop(ennemi);
+    const res=résoudreT(j,e,mi);éq[idxActif]=res.j;
+    setJournal(prev=>[...prev,...res.logs]);setEquipe(éq);
+    if(res.eKO){setEnnemi({...res.e,pv:0});setJournal(prev=>[...prev,"🏆 Victoire!"]);setTimeout(()=>aprèsVictoire(éq,nœudEnAttente),1400);}
+    else if(res.jKO){setEnnemi(res.e);
+      if(!éq.filter(p=>!p.evanoui).length){setJournal(prev=>[...prev,"💀 Tous vos Pokémon sont K.O..."]);setTimeout(()=>setEcran("défaite"),1400);}
+      else{setBesoinÉchange(true);setVoirÉchange(true);setPhase("switch");}
+    }else{setEnnemi(res.e);setPhase("choisir");}
+  }
+
+  /* ── ÉCHANGE ── */
+  function échangerPokémon(idx){
+    if(equipe[idx].evanoui||idx===idxActif)return;
+    setIdxActif(idx);setVoirÉchange(false);
+    if(besoinÉchange){setBesoinÉchange(false);setPhase("choisir");return;}
+    setPhase("occupé");
+    const éq=cop(equipe);const j=éq[idx];const e=cop(ennemi);
+    const em=choisirCapIA(e,j);const logs=["Vous faites appel à "+j.nom+"!"];
+    const sr=verifierStatut(e,true);logs.push(...sr.logs);if(sr.ok)logs.push(...executerCap(e,j,em,true));
+    logs.push(...finTour(j,false));logs.push(...finTour(e,true));
+    if(j.pv<=0){j.evanoui=true;logs.push("Votre "+j.nom+" est K.O.!");}
+    if(e.pv<=0)logs.push(e.nom+" est K.O.!");
+    éq[idx]=j;setJournal(prev=>[...prev,...logs]);setEquipe(éq);setEnnemi(e);
+    if(e.pv<=0){setJournal(prev=>[...prev,"🏆 Victoire!"]);setTimeout(()=>aprèsVictoire(éq,nœudEnAttente),1400);}
+    else if(j.pv<=0){if(!éq.filter(p=>!p.evanoui).length)setTimeout(()=>setEcran("défaite"),1200);else{setBesoinÉchange(true);setVoirÉchange(true);setPhase("switch");}}
+    else setPhase("choisir");
+  }
+
+  /* ── UTILISER OBJET ── */
+  function utiliserObjet(obj,tIdx){
+    const éq=cop(equipe);const pk=éq[tIdx];
+    const inv=[...inventaire];const ri=inv.findIndex(i=>i.id===obj.id);if(ri!==-1)inv.splice(ri,1);
+    const logs=[];
+    if(obj.heal){const h=Math.min(obj.heal,pk.pvMax-pk.pv);pk.pv=Math.min(pk.pvMax,pk.pv+obj.heal);logs.push(obj.nom+" → +"+h+" PV à "+pk.nom);}
+    if(obj.healFull){pk.pv=pk.pvMax;if(obj.cure){pk.status=null;pk.statusCnt=0;}logs.push(obj.nom+" sur "+pk.nom+"! PV max restaurés!");}
+    if(obj.cureAll){pk.status=null;pk.statusCnt=0;logs.push(pk.nom+" est soigné!");}
+    if(obj.cureStatus){if(pk.status===obj.cureStatus||(obj.cureStatus==="psn"&&pk.status==="bpsn")){pk.status=null;pk.statusCnt=0;logs.push("Statut de "+pk.nom+" soigné!");}}
+    if(obj.revive&&pk.evanoui){pk.pv=0|pk.pvMax/2;pk.evanoui=false;logs.push(pk.nom+" revient! ("+pk.pv+" PV)");}
+    if(obj.maxRevive&&pk.evanoui){pk.pv=pk.pvMax;pk.evanoui=false;logs.push(pk.nom+" revient avec tous ses PV!");}
+    if(obj.maxElixir){pk.caps.forEach(c=>{c.pp=c.maxPp;});logs.push("Tous les PP de "+pk.nom+" restaurés!");}
+    if(obj.boost)Object.entries(obj.boost).forEach(([s,v])=>{pk.boost[s]=(pk.boost[s]||0)+v;logs.push(pk.nom+" : "+s+" augmente!");});
+    if(obj.held){pk.tenu=obj.held;logs.push(pk.nom+" tient maintenant : "+obj.nom+"!");}
+    éq[tIdx]=pk;setEquipe(éq);setInventaire(inv);setJournal(prev=>[...prev,...logs]);setVoirSac(false);
+    if(ecran==="combat"&&phase==="choisir"){
+      setPhase("occupé");const e=cop(ennemi);const jou=éq[idxActif];
+      const em=choisirCapIA(e,jou);const el=[];
+      const sr=verifierStatut(e,true);el.push(...sr.logs);if(sr.ok)el.push(...executerCap(e,jou,em,true));
+      el.push(...finTour(jou,false));el.push(...finTour(e,true));
+      if(jou.pv<=0){jou.evanoui=true;el.push("Votre "+jou.nom+" est K.O.!");}
+      if(e.pv<=0)el.push(e.nom+" est K.O.!");
+      éq[idxActif]=jou;setEquipe(éq);setEnnemi(e);setJournal(prev=>[...prev,...el]);
+      if(e.pv<=0){setJournal(prev=>[...prev,"🏆 Victoire!"]);setTimeout(()=>aprèsVictoire(éq,nœudEnAttente),1400);}
+      else if(jou.pv<=0){if(!éq.filter(p=>!p.evanoui).length)setTimeout(()=>setEcran("défaite"),1200);else{setBesoinÉchange(true);setVoirÉchange(true);setPhase("switch");}}
+      else setPhase("choisir");
+    }
+  }
+
+  /* ═══════════════ STYLES ═══════════════ */
+  const gc=genSel?GENS[genSel].col:"#a078e8";
+  const gc2=genSel?GENS[genSel].col2:"#6848c8";
+  const gbkg=genSel?GENS[genSel].bkg:"radial-gradient(ellipse,#180828 0%,#06060f 70%)";
+  const CARTE_ST={background:gbkg,color:"#e8e8f8",fontFamily:"'Press Start 2P',monospace"};
+  const PANNEAU={width:175,minHeight:"100vh",background:"rgba(8,8,20,0.97)",borderRight:"2px solid rgba(255,255,255,.06)",padding:12,flexShrink:0};
+  const PANNEAU_D={...PANNEAU,borderRight:"none",borderLeft:"2px solid rgba(255,255,255,.06)"};
+  const TITREP={fontSize:9,color:gc,letterSpacing:2,borderBottom:"1px solid rgba(255,255,255,.08)",paddingBottom:7,marginBottom:10};
+  function CARTE(extra){return{background:"rgba(14,14,28,.95)",border:"1px solid rgba(255,255,255,.08)",borderRadius:8,padding:12,backdropFilter:"blur(4px)",...extra};}
+  function BTN(c,extra){return{padding:"9px 12px",background:"transparent",border:"2px solid "+c,borderRadius:5,color:c,fontFamily:"'Press Start 2P',monospace",fontSize:8,cursor:"pointer",transition:"background .15s",...extra};}
+
+  function PanneauGauche(){return(
+    <div style={PANNEAU}>
+      {genSel&&<div style={{...TITREP,fontSize:8}}>{GENS[genSel].n}</div>}
+      <div style={TITREP}>ÉQUIPE</div>
+      {!equipe.length&&<div style={{fontSize:6,color:"#2a2a40"}}>Aucun Pokémon</div>}
+      {equipe.map((p,i)=>(
+        <div key={i} style={{marginBottom:12,opacity:p.evanoui?.35:1,background:i===idxActif&&ecran==="combat"?"rgba(255,255,255,.04)":"transparent",borderRadius:5,padding:4}}>
+          <div style={{display:"flex",gap:6,marginBottom:4}}>
+            <img src={p.sprite} alt="" style={{width:36,height:36}}/>
+            <div style={{flex:1}}>
+              <div style={{fontSize:7,color:gc,textTransform:"capitalize",marginBottom:1}}>{p.nom}</div>
+              <div style={{fontSize:6,color:"#686888"}}>Niv.{p.lv}</div>
+              {p.tenu&&<div style={{fontSize:5,color:"#5858a8",marginTop:1}}>📦 {p.tenu.slice(0,8)}</div>}
+              <div style={{display:"flex",gap:2,marginTop:2,flexWrap:"wrap"}}>{p.types.map(t=><BTyp key={t} type={t}/>)}</div>
             </div>
           </div>
-        )):draftPicks.map((item,i)=>(
-          <div key={i} onClick={()=>onDraftPick(i)}
-            style={{...CARD,cursor:"pointer",width:220,textAlign:"center",transition:"transform .2s,box-shadow .2s"}}
-            onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-6px)";e.currentTarget.style.boxShadow="0 14px 40px rgba(167,139,250,.3)";}}
-            onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=CARD.boxShadow;}}>
-            <div style={{fontSize:54,margin:"12px 0"}}>{item.emoji}</div>
-            <div style={{fontWeight:800,fontSize:17}}>{item.name}</div>
-            <div style={{fontSize:12,color:"#aaa",marginTop:6}}>{item.desc}</div>
+          <BarrePV cur={p.pv} max={p.pvMax}/>
+          <div style={{fontSize:6,color:"#383858",marginTop:1}}>{p.pv}/{p.pvMax} PV</div>
+          <BStatut status={p.status}/>
+        </div>
+      ))}
+    </div>
+  );}
+
+  function PanneauDroit(){
+    const groupés=inventaire.reduce((a,i)=>{a[i.id]=a[i.id]||{obj:i,n:0};a[i.id].n++;return a;},{});
+    const parCat=Object.values(groupés).reduce((a,{obj,n})=>{
+      const c=obj.cat||"autre";if(!a[c])a[c]=[];a[c].push({obj,n});return a;
+    },{});
+    const nomsCat={méd:"Médecines",combat:"Combat",baie:"Baies",tenu:"Objets Tenus",autre:"Divers"};
+    return(
+      <div style={PANNEAU_D}>
+        <div style={TITREP}>INVENTAIRE</div>
+        {!inventaire.length&&<div style={{fontSize:6,color:"#2a2a40"}}>Sac vide</div>}
+        {Object.entries(parCat).map(([cat,items])=>(
+          <div key={cat} style={{marginBottom:10}}>
+            <div style={{fontSize:6,color:gc2,marginBottom:5,letterSpacing:1}}>{nomsCat[cat]||cat}</div>
+            {items.map(({obj,n})=>(
+              <div key={obj.id} style={{display:"flex",justifyContent:"space-between",fontSize:6,color:"#c8c0e0",marginBottom:4,padding:"2px 4px",background:"rgba(255,255,255,.03)",borderRadius:3}}>
+                <span>{obj.e} {obj.nom.slice(0,11)}</span><span style={{color:"#686880"}}>×{n}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+        <div style={{...TITREP,marginTop:14}}>MÉDAILLES</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:4}}>
+          {Array.from({length:8}).map((_,i)=>(
+            <div key={i} style={{width:22,height:22,borderRadius:"50%",background:i<médailles?gc:"#0c0c18",border:"2px solid "+(i<médailles?gc:"#1c1c30"),boxShadow:i<médailles?"0 0 8px "+gc+"88":"none",transition:"all .3s"}}/>
+          ))}
+        </div>
+        <div style={{...TITREP,marginTop:14}}>CARTE</div>
+        <div style={{fontSize:6,color:"#404060"}}>{effacés.size-1}/12 zones</div>
+        {posActuelle!=="dep"&&posActuelle!=="fin"&&(()=>{
+          const n=NOEUDS.find(x=>x.id===posActuelle);
+          if(n&&n.zone&&genSel){const gd=GENS[genSel];return <div style={{fontSize:6,color:gc,marginTop:4}}>{gd.zn?.[n.zone-1]||"Zone "+n.zone}</div>;}
+          return null;
+        })()}
+      </div>
+    );
+  }
+
+  /* ═══════════════ ÉCRANS ═══════════════ */
+
+  /* ── SÉLECTION GÉNÉRATION ── */
+  if(ecran==="genSelect")return(
+    <div style={{minHeight:"100vh",background:"radial-gradient(ellipse at 50% 30%,#180828,#06060f)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{textAlign:"center",marginBottom:28}}>
+        <div style={{fontSize:22,fontWeight:700,background:"linear-gradient(90deg,#a078e8,#e878b8)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",letterSpacing:3,marginBottom:6}}>
+          POKÉLIKE
+        </div>
+        <div style={{fontSize:9,color:"#484868",letterSpacing:2}}>Choisissez votre génération</div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,maxWidth:720}}>
+        {Object.entries(GENS).map(([num,gd])=>(
+          <div key={num} onClick={()=>démarrerChargement(+num)}
+            style={{background:"rgba(14,14,28,.9)",border:"1px solid rgba(255,255,255,.06)",borderRadius:10,padding:16,cursor:"pointer",textAlign:"center",transition:"all .2s",position:"relative",overflow:"hidden"}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor=gd.col;e.currentTarget.style.boxShadow="0 0 20px "+gd.col+"44";e.currentTarget.style.transform="translateY(-3px)";}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,.06)";e.currentTarget.style.boxShadow="none";e.currentTarget.style.transform="none";}}>
+            <div style={{position:"absolute",top:0,left:0,right:0,height:3,background:"linear-gradient(90deg,"+gd.col+","+gd.col2+")"}}/>
+            <div style={{fontSize:22,marginBottom:6}}>{gd.ico}</div>
+            <div style={{fontSize:8,color:gd.col,marginBottom:4,letterSpacing:1}}>{gd.n}</div>
+            <div style={{fontSize:9,fontWeight:700,color:"#e8e8f8",marginBottom:3}}>{gd.reg}</div>
+            <div style={{fontSize:6,color:"#484868"}}>{gd.ver}</div>
           </div>
         ))}
       </div>
     </div>
   );
 
-  if(screen==="battle"){
-    const player=team[activeIdx];
-    const alive=team.filter(p=>!p.fainted);
-    return(
-      <div style={{minHeight:"100vh",background:BG,display:"flex",flexDirection:"column",alignItems:"center",padding:"14px 12px 24px",fontFamily:"system-ui,sans-serif",color:"#e0e0f0"}}>
-        <div style={{width:"100%",maxWidth:660,display:"flex",flexDirection:"column",gap:8}}>
-          <div style={{display:"flex",justifyContent:"space-between",padding:"2px 0"}}>
-            <span style={{fontSize:10,fontWeight:900,color:"#a78bfa",letterSpacing:3}}>⚔️ ARENA {arena}</span>
-            <span style={{fontSize:10,color:"#444"}}>{alive.length}/{team.length} alive</span>
-          </div>
-          {enemy&&(
-            <div style={CARD}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
-                <div>
-                  <div style={{fontWeight:800,fontSize:15,textTransform:"capitalize"}}>{enemy.name}</div>
-                  <div style={{display:"flex",gap:4,marginTop:4,flexWrap:"wrap"}}>{enemy.types.map(t=><TBadge key={t} type={t}/>)}<SBadge status={enemy.status}/></div>
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:13,color:"#a78bfa",fontWeight:700}}>Lv.{enemy.level}</div>
-                  <div style={{fontSize:11,color:"#555"}}>{enemy.hp}/{enemy.maxHp}</div>
-                </div>
-              </div>
-              <HPBar cur={enemy.hp} max={enemy.maxHp} lg={true}/>
-            </div>
-          )}
-          {enemy&&<div style={{display:"flex",justifyContent:"flex-end",paddingRight:18,marginTop:-6,marginBottom:-18,zIndex:1}}>
-            <img src={enemy.sprite} alt={enemy.name} style={{width:80,height:80,imageRendering:"pixelated"}}/>
-          </div>}
-          <div ref={logRef} style={{...CARD,height:96,overflowY:"auto",fontSize:12,color:"#b0b0d0",lineHeight:1.9,fontFamily:"monospace"}}>
-            {log.slice(-20).map((l,i)=><div key={i} style={{borderBottom:"1px solid #1a1a3a",padding:"0 2px"}}>{l}</div>)}
-          </div>
-          {player&&(
-            <div style={CARD}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <img src={player.sprite} alt={player.name} style={{width:54,height:54,imageRendering:"pixelated"}}/>
-                  <div>
-                    <div style={{fontWeight:800,fontSize:15,textTransform:"capitalize"}}>{player.name}</div>
-                    <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>{player.types.map(t=><TBadge key={t} type={t}/>)}<SBadge status={player.status}/>{player.held&&<span style={{fontSize:9,color:"#666"}}>📦{player.held}</span>}</div>
-                  </div>
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:13,color:"#a78bfa",fontWeight:700}}>Lv.{player.level}</div>
-                  <div style={{fontSize:11,color:"#555"}}>{player.hp}/{player.maxHp}</div>
-                </div>
-              </div>
-              <HPBar cur={player.hp} max={player.maxHp} lg={true}/>
-            </div>
-          )}
-          {!showBag&&!showSwitch&&player&&phase==="choose"&&(
-            <div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
-                {player.moves.map((m,i)=>(
-                  <button key={i} onClick={()=>onMove(i)} disabled={m.pp<=0}
-                    style={{background:m.pp>0?(TC2[m.t]||"#555")+"1a":"#111",border:"2px solid "+(m.pp>0?(TC2[m.t]||"#555"):"#2a2a50"),borderRadius:10,padding:"10px 12px",cursor:m.pp>0?"pointer":"not-allowed",color:m.pp>0?"#fff":"#444",display:"flex",justifyContent:"space-between",alignItems:"center"}}
-                    onMouseEnter={e=>{if(m.pp>0)e.currentTarget.style.background=(TC2[m.t]||"#555")+"33";}}
-                    onMouseLeave={e=>{e.currentTarget.style.background=m.pp>0?(TC2[m.t]||"#555")+"1a":"#111";}}>
-                    <div>
-                      <div style={{fontSize:12,fontWeight:700,textTransform:"capitalize",marginBottom:3}}>{m.name.replace(/-/g," ")}</div>
-                      <div style={{display:"flex",gap:4,alignItems:"center"}}><TBadge type={m.t}/><span style={{fontSize:10,color:"#999"}}>{m.p?"💥 "+m.p:"Status"} {m.dc==="phy"?"⚔":"✨"}</span></div>
-                    </div>
-                    <div style={{fontSize:10,color:m.pp<=m.maxPp*.3?"#f87171":"#a78bfa",fontWeight:700,textAlign:"right"}}>{m.pp}<span style={{color:"#444"}}>/{m.maxPp}</span></div>
-                  </button>
-                ))}
-              </div>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={()=>setShowBag(true)} style={{...BTN("#74b9ff"),flex:1}}>🎒 Bag ({inventory.length})</button>
-                <button onClick={()=>setShowSwitch(true)} disabled={alive.length<=1} style={{...BTN("#55efc4"),flex:1,opacity:alive.length<=1?.4:1}}>🔄 Switch</button>
-              </div>
-            </div>
-          )}
-          {!showBag&&!showSwitch&&phase==="busy"&&<div style={{textAlign:"center",color:"#444",fontSize:14,padding:14}}>⏳</div>}
-          {showBag&&(
-            <div style={CARD}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}>
-                <span style={{fontWeight:800}}>🎒 Bag</span>
-                <button onClick={()=>setShowBag(false)} style={{background:"none",border:"none",color:"#666",fontSize:18,cursor:"pointer"}}>✕</button>
-              </div>
-              {inventory.length===0&&<div style={{color:"#444",textAlign:"center",padding:16,fontSize:13}}>Bag is empty!</div>}
-              {Object.entries(inventory.reduce((a,i)=>{a[i.id]=a[i.id]||{item:i,count:0};a[i.id].count++;return a;},{})).map(([id,{item,count}])=>(
-                <div key={id} style={{marginBottom:10}}>
-                  <div style={{fontSize:12,fontWeight:700,marginBottom:6,color:"#c0c0e0"}}>{item.emoji} {item.name} x{count} <span style={{fontWeight:400,color:"#555",fontSize:11}}>— {item.desc}</span></div>
-                  {item.revive?team.filter(p=>p.fainted).map(p=>{const ti=team.findIndex(t=>t.id===p.id);return(
-                    <button key={ti} onClick={()=>onUseItem(item,ti)} style={{...BTN("#a29bfe"),display:"block",width:"100%",marginBottom:4,textTransform:"capitalize",textAlign:"left",padding:"7px 12px"}}>Use on {p.name} (fainted)</button>
-                  );}):!item.held?team.filter(p=>!p.fainted).map(p=>{const ti=team.findIndex(t=>t.id===p.id);return(
-                    <button key={ti} onClick={()=>onUseItem(item,ti)} style={{...BTN("#74b9ff"),display:"block",width:"100%",marginBottom:4,textTransform:"capitalize",textAlign:"left",padding:"7px 12px"}}>Use on {p.name}</button>
-                  );}):team.filter(p=>!p.fainted&&!p.held).map(p=>{const ti=team.findIndex(t=>t.id===p.id);return(
-                    <button key={ti} onClick={()=>onUseItem(item,ti)} style={{...BTN("#55efc4"),display:"block",width:"100%",marginBottom:4,textTransform:"capitalize",textAlign:"left",padding:"7px 12px"}}>Give to {p.name}</button>
-                  );})}
-                </div>
-              ))}
-            </div>
-          )}
-          {showSwitch&&(
-            <div style={CARD}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
-                <span style={{fontWeight:800}}>{needSwitch?"😵 Choose next Pokémon":"🔄 Switch Pokémon"}</span>
-                {!needSwitch&&<button onClick={()=>setShowSwitch(false)} style={{background:"none",border:"none",color:"#666",fontSize:18,cursor:"pointer"}}>✕</button>}
-              </div>
-              {team.map((p,i)=>(
-                <button key={i} onClick={()=>!p.fainted&&i!==activeIdx&&onSwitch(i)} disabled={p.fainted||i===activeIdx}
-                  style={{display:"flex",alignItems:"center",gap:10,width:"100%",padding:"8px 10px",marginBottom:6,background:i===activeIdx?"#2a2a44":p.fainted?"#111":"#1a2a3a",border:"1px solid "+(i===activeIdx?"#a78bfa":p.fainted?"#222":"#3d6d9a"),borderRadius:10,color:p.fainted?"#333":"#fff",cursor:p.fainted||i===activeIdx?"not-allowed":"pointer",opacity:p.fainted?.35:1}}>
-                  <img src={p.sprite} alt={p.name} style={{width:36,height:36,imageRendering:"pixelated"}}/>
-                  <div style={{flex:1,textAlign:"left"}}>
-                    <div style={{textTransform:"capitalize",fontWeight:700,fontSize:13}}>{p.name}</div>
-                    <div style={{fontSize:10,color:"#666"}}>{p.hp}/{p.maxHp} HP {p.fainted?"(Fainted)":i===activeIdx?"(Active)":""}</div>
-                  </div>
-                  <div style={{width:70}}><HPBar cur={p.hp} max={p.maxHp}/></div>
-                </button>
-              ))}
-            </div>
-          )}
+  /* ── CHARGEMENT ── */
+  if(ecran==="chargement"){const gd=genSel?GENS[genSel]:null;return(
+    <div style={{minHeight:"100vh",background:gbkg,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{textAlign:"center",maxWidth:340}}>
+        <div style={{fontSize:9,color:gc,letterSpacing:2,marginBottom:4}}>{gd?.n||""} — {gd?.reg||""}</div>
+        <div style={{fontSize:22,marginBottom:10}}>{gd?.ico||"⚡"}</div>
+        <div style={{fontSize:7,color:"#484868",marginBottom:20}}>{chargMsg}</div>
+        <div style={{background:"rgba(255,255,255,.05)",borderRadius:6,overflow:"hidden",height:10,marginBottom:8,border:"1px solid rgba(255,255,255,.06)"}}>
+          <div style={{width:chargPct+"%",height:"100%",background:"linear-gradient(90deg,"+gc+","+gc2+")",transition:"width .2s",boxShadow:"0 0 10px "+gc+"88"}}/>
         </div>
+        <div style={{fontSize:6,color:"#303048"}}>{chargPct}%</div>
+      </div>
+    </div>
+  );}
+
+  /* ── DRAFT / STARTER / RÉCOMPENSE ── */
+  if(ecran==="draft"){const gd=genSel?GENS[genSel]:null;
+    const picks=typeDraft==="starter"?propsStar:propsDraft;
+    const isPoke=typeDraft!=="objet";
+    return(
+      <div style={{display:"flex",width:"100%",maxWidth:960,minHeight:"100vh"}}>
+        <PanneauGauche/>
+        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:20,...CARTE_ST}}>
+          <div style={{textAlign:"center",marginBottom:4}}>
+            <div style={{fontSize:8,color:gc,letterSpacing:2,marginBottom:6}}>
+              {typeDraft==="starter"?"CHOISISSEZ VOTRE STARTER":typeDraft==="pokémon"?"NOUVEAU COÉQUIPIER":"RÉCOMPENSE"}
+            </div>
+            {typeDraft==="pokémon"&&gd&&<div style={{fontSize:7,color:gc2}}>
+              {gd.zn?.[zoneDraft-1]||"Zone "+zoneDraft} — Pokémon de niveau 50
+            </div>}
+          </div>
+          <div style={{display:"flex",gap:14,flexWrap:"wrap",justifyContent:"center",maxWidth:880}}>
+            {isPoke?picks.filter(Boolean).map((p,i)=>(
+              <div key={i} onClick={()=>{
+                const j=mkJoueur(p);
+                if(typeDraft==="starter"){setEquipe([j]);setIdxActif(0);setEcran("carte");}
+                else{setEquipe(prev=>[...prev,j]);setEcran("carte");}
+              }}
+                style={{...CARTE({width:198,cursor:"pointer",transition:"all .2s",textAlign:"center"}),position:"relative"}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor=gc;e.currentTarget.style.boxShadow="0 0 24px "+gc+"44";e.currentTarget.style.transform="translateY(-5px)";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,.08)";e.currentTarget.style.boxShadow="none";e.currentTarget.style.transform="none";}}>
+                <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,"+gc+","+gc2+")",borderRadius:"8px 8px 0 0"}}/>
+                <div style={{display:"flex",justifyContent:"center",gap:3,marginBottom:8,flexWrap:"wrap",marginTop:6}}>{p.types.map(t=><BTyp key={t} type={t}/>)}</div>
+                <img src={p.art||p.sprite} alt={p.nom} style={{width:100,height:100,objectFit:"contain"}}/>
+                <div style={{fontSize:9,color:gc,textTransform:"capitalize",margin:"6px 0"}}>{p.nom}</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:2,fontSize:6,marginBottom:8}}>
+                  {[["PV",p.stats.hp],["ATT",p.stats.attack],["DÉF",p.stats.defense],["ATSP",p.stats.specialAttack],["DFSP",p.stats.specialDefense],["VIT",p.stats.speed]].map(([k,v])=>(
+                    <div key={k} style={{background:"rgba(255,255,255,.04)",borderRadius:3,padding:"2px 4px",display:"flex",justifyContent:"space-between",border:"1px solid rgba(255,255,255,.05)"}}>
+                      <span style={{color:gc2}}>{k}</span><span style={{color:"#a0a0c0"}}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:2,justifyContent:"center"}}>
+                  {p.caps.slice(0,4).map((c,j)=>(
+                    <span key={j} style={{background:(TCOL[c.t]||"#555")+"22",border:"1px solid "+(TCOL[c.t]||"#555"),color:TCOL[c.t]||"#aaa",borderRadius:4,padding:"1px 4px",fontSize:7,textTransform:"capitalize"}}>{c.nom.replace(/-/g," ").slice(0,12)}</span>
+                  ))}
+                </div>
+              </div>
+            )):picks.filter(Boolean).map((obj,i)=>(
+              <div key={i} onClick={()=>{setInventaire(prev=>[...prev,obj]);setEcran("carte");}}
+                style={{...CARTE({width:180,cursor:"pointer",transition:"all .2s",textAlign:"center"}),position:"relative"}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor=gc;e.currentTarget.style.boxShadow="0 0 24px "+gc+"44";e.currentTarget.style.transform="translateY(-5px)";}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor="rgba(255,255,255,.08)";e.currentTarget.style.boxShadow="none";e.currentTarget.style.transform="none";}}>
+                <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,"+gc+","+gc2+")",borderRadius:"8px 8px 0 0"}}/>
+                <div style={{fontSize:10,color:gc2,letterSpacing:1,marginTop:6,marginBottom:4}}>{obj.cat?.toUpperCase()||"OBJET"}</div>
+                <div style={{fontSize:44,margin:"10px 0"}}>{obj.e}</div>
+                <div style={{fontSize:9,color:gc,marginBottom:5}}>{obj.nom}</div>
+                <div style={{fontSize:7,color:"#686888",lineHeight:1.7}}>{obj.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <PanneauDroit/>
       </div>
     );
   }
 
-  if(screen==="gameover")return(
-    <div style={{minHeight:"100vh",background:BG,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui,sans-serif",color:"#e0e0f0"}}>
-      <div style={{...CARD,maxWidth:400,textAlign:"center"}}>
-        <div style={{fontSize:60,marginBottom:10}}>💀</div>
-        <div style={{fontSize:22,fontWeight:900,color:"#f87171",marginBottom:6}}>GAME OVER</div>
-        <div style={{color:"#555",marginBottom:18}}>You reached Arena {arena}</div>
-        <div style={{marginBottom:20,textAlign:"left"}}>
-          {team.map((p,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"5px 0",borderBottom:"1px solid #1a1a3a"}}>
-              <img src={p.sprite} alt={p.name} style={{width:36,height:36,imageRendering:"pixelated",opacity:p.fainted?.3:1}}/>
-              <span style={{textTransform:"capitalize",color:p.fainted?"#444":"#fff",flex:1}}>{p.name}</span>
-              {p.fainted?<span style={{color:"#f87171",fontSize:11}}>fainted</span>:<span style={{color:"#4ade80",fontSize:11}}>{p.hp}/{p.maxHp} HP</span>}
-            </div>
-          ))}
+  /* ── CARTE ── */
+  if(ecran==="carte"){const curN=NOEUDS.find(n=>n.id===posActuelle);
+    return(
+      <div style={{display:"flex",width:"100%",maxWidth:960,minHeight:"100vh"}}>
+        <PanneauGauche/>
+        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"12px 0",...CARTE_ST}}>
+          {msgCarte&&<div style={{...CARTE({maxWidth:CARTE_W,marginBottom:10}),fontSize:7,color:gc,textAlign:"center"}}>{msgCarte}</div>}
+          <div style={{position:"relative",width:CARTE_W,height:CARTE_H,flexShrink:0}}>
+            <CarteSVG genCol={gc}/>
+            {NOEUDS.filter(n=>n.id!=="dep").map(nœud=>{
+              const isEff=effacés.has(nœud.id),isAv=disponibles.includes(nœud.id);
+              const adv=ennemisNœud[nœud.id],rev=révélés[nœud.id]||nœud.type;
+              const estElite=nœud.type==="elite";
+              const clGlow=isAv&&!isEff?gc:"transparent";
+              return(
+                <div key={nœud.id} className={isAv&&!isEff?"pulse":""} onClick={()=>isAv&&!isEff&&clicNœud(nœud.id)}
+                  style={{position:"absolute",left:nœud.x-20,top:nœud.y-20,width:40,height:40,borderRadius:"50%",
+                    background:isEff?"rgba(20,60,20,.9)":nœud.type==="centre"?"rgba(20,80,80,.9)":estElite?"rgba(40,0,80,.9)":"rgba(10,10,30,.9)",
+                    border:"2px solid "+(isAv&&!isEff?gc:isEff?"#308830":estElite?gc2:"#1c1c3c"),
+                    cursor:isAv&&!isEff?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",
+                    overflow:"hidden",zIndex:2,transition:"border-color .3s","--gc":clGlow}}>
+                  {isEff?<span style={{fontSize:16,color:"#40e040"}}>✓</span>
+                   :nœud.type==="centre"?<span style={{fontSize:14}}>🏥</span>
+                   :nœud.type==="mystere"&&!révélés[nœud.id]?<span style={{fontSize:11,color:gc,fontFamily:"monospace",fontWeight:"bold"}}>?</span>
+                   :adv?<img src={adv.sprite} alt="" style={{width:34,height:34}}/>
+                   :<span style={{fontSize:10,color:"#a0a080"}}>?</span>}
+                  {estElite&&!isEff&&<div style={{position:"absolute",top:-4,right:-4,width:14,height:14,background:gc2,borderRadius:"50%",border:"2px solid white",fontSize:6,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",boxShadow:"0 0 6px "+gc2}}>★</div>}
+                  {adv&&!isEff&&disponibles.includes(nœud.id)&&<div style={{position:"absolute",bottom:-18,left:"50%",transform:"translateX(-50%)",fontSize:6,color:gc,whiteSpace:"nowrap",textTransform:"capitalize"}}>{adv.nom}</div>}
+                </div>
+              );
+            })}
+            {/* Joueur */}
+            {curN&&<div style={{position:"absolute",left:curN.x-14,top:curN.y-14,width:28,height:28,borderRadius:"50%",background:"rgba(10,20,60,.9)",border:"2px solid "+gc,zIndex:5,display:"flex",alignItems:"center",justifyContent:"center",overflow:"hidden",boxShadow:"0 0 12px "+gc}}>
+              {equipe.find(p=>!p.evanoui)&&<img src={equipe.find(p=>!p.evanoui).sprite} alt="" style={{width:28,height:28}}/>}
+            </div>}
+          </div>
+          <div style={{marginTop:10,fontSize:6,color:"#2a2a40",textAlign:"center"}}>Cliquez un nœud adjacent • ★ Dresseur Élite</div>
         </div>
-        <button onClick={()=>window.location.reload()} style={{...BTN("#f87171"),padding:"12px 32px",fontSize:15}}>🔄 Play Again</button>
+        <PanneauDroit/>
+      </div>
+    );
+  }
+
+  /* ── COMBAT ── */
+  if(ecran==="combat"){
+    const joueur=equipe[idxActif];const vivants=equipe.filter(p=>!p.evanoui);
+    const CRD=CARTE({width:"100%",maxWidth:440});
+    return(
+      <div style={{display:"flex",width:"100%",maxWidth:960,minHeight:"100vh"}}>
+        <PanneauGauche/>
+        <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",padding:"12px 8px 20px",gap:8,...CARTE_ST}}>
+          {/* Ennemi */}
+          {ennemi&&<div style={{...CRD,position:"relative"}}>
+            <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,"+gc+","+gc2+")",borderRadius:"8px 8px 0 0"}}/>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:8,marginTop:4}}>
+              <div>
+                <div style={{fontSize:10,color:gc,textTransform:"capitalize",marginBottom:4}}>{ennemi.nom}</div>
+                <div style={{display:"flex",gap:3,flexWrap:"wrap"}}>{ennemi.types.map(t=><BTyp key={t} type={t}/>)}<BStatut status={ennemi.status}/></div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:9,color:"#686888"}}>Niv.{ennemi.lv}</div>
+                <div style={{fontSize:7,color:"#404060"}}>{ennemi.pv}/{ennemi.pvMax}</div>
+              </div>
+            </div>
+            <BarrePV cur={ennemi.pv} max={ennemi.pvMax} grand={true}/>
+          </div>}
+          {ennemi&&<div style={{display:"flex",justifyContent:"flex-end",width:"100%",maxWidth:440,paddingRight:16,marginTop:-4,marginBottom:-14,zIndex:1}}>
+            <img src={ennemi.sprite} alt="" style={{width:74,height:74}}/>
+          </div>}
+          {/* Journal */}
+          <div ref={jRef} style={{...CRD,height:88,overflowY:"auto",fontSize:7,color:"#90d048",lineHeight:2.2,fontFamily:"'Courier New',monospace"}}>
+            {journal.slice(-25).map((l,i)=><div key={i} style={{borderBottom:"1px solid rgba(255,255,255,.04)",padding:"0 2px"}}>{l}</div>)}
+          </div>
+          {/* Joueur */}
+          {joueur&&<div style={CRD}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <div style={{display:"flex",gap:8}}>
+                <img src={joueur.sprite} alt="" style={{width:50,height:50}}/>
+                <div>
+                  <div style={{fontSize:9,color:gc,textTransform:"capitalize",marginBottom:3}}>{joueur.nom}</div>
+                  <div style={{display:"flex",gap:3,flexWrap:"wrap"}}>{joueur.types.map(t=><BTyp key={t} type={t}/>)}<BStatut status={joueur.status}/></div>
+                  {joueur.tenu&&<div style={{fontSize:6,color:"#5050a8",marginTop:2}}>📦 {joueur.tenu}</div>}
+                </div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:9,color:"#686888"}}>Niv.{joueur.lv}</div>
+                <div style={{fontSize:7,color:"#404060"}}>{joueur.pv}/{joueur.pvMax} PV</div>
+              </div>
+            </div>
+            <BarrePV cur={joueur.pv} max={joueur.pvMax} grand={true}/>
+          </div>}
+          {/* Capacités */}
+          {!voirSac&&!voirÉchange&&joueur&&phase==="choisir"&&<div style={{width:"100%",maxWidth:440}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:7}}>
+              {joueur.caps.map((c,i)=>(
+                <button key={i} onClick={()=>choisirCap(i)} disabled={c.pp<=0}
+                  style={{background:c.pp>0?(TCOL[c.t]||"#555")+"18":"#080810",border:"1px solid "+(c.pp>0?(TCOL[c.t]||"#555"):"#1a1a2a"),borderRadius:6,padding:"10px 10px",cursor:c.pp>0?"pointer":"not-allowed",color:c.pp>0?"#e8e0d8":"#282838",display:"flex",flexDirection:"column",gap:4,textAlign:"left",fontFamily:"'Press Start 2P',monospace"}}
+                  onMouseEnter={e=>{if(c.pp>0)e.currentTarget.style.background=(TCOL[c.t]||"#555")+"30";}}
+                  onMouseLeave={e=>{e.currentTarget.style.background=c.pp>0?(TCOL[c.t]||"#555")+"18":"#080810";}}>
+                  <div style={{fontSize:8,fontWeight:700,textTransform:"capitalize"}}>{c.nom.replace(/-/g," ")}</div>
+                  <div style={{display:"flex",gap:4,alignItems:"center"}}><BTyp type={c.t}/><span style={{fontSize:6,color:"#a0a0b8"}}>{c.p?c.p:"—"} {c.dc==="phy"?"⚔":"✨"}</span></div>
+                  <div style={{fontSize:6,color:c.pp<=c.maxPp*.3?"#e84040":"#686888",textAlign:"right"}}>{c.pp}/{c.maxPp} PP</div>
+                </button>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:7}}>
+              <button onClick={()=>setVoirSac(true)} style={{...BTN(gc),flex:1}}>🎒 SAC ({inventaire.length})</button>
+              <button onClick={()=>setVoirÉchange(true)} disabled={vivants.length<=1} style={{...BTN(gc2),flex:1,opacity:vivants.length<=1?.35:1}}>⇄ ÉCHANGE</button>
+            </div>
+          </div>}
+          {!voirSac&&!voirÉchange&&phase==="occupé"&&<div style={{color:"#2a2a48",fontSize:8,padding:12}}>⏳</div>}
+          {/* Sac */}
+          {voirSac&&<div style={{...CARTE({width:"100%",maxWidth:440}),maxHeight:320,overflowY:"auto"}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+              <span style={{fontSize:9,color:gc}}>🎒 SAC</span>
+              <button onClick={()=>setVoirSac(false)} style={{background:"none",border:"none",color:"#484868",fontSize:14,cursor:"pointer"}}>✕</button>
+            </div>
+            {!inventaire.length&&<div style={{fontSize:7,color:"#303050",textAlign:"center",padding:12}}>Sac vide!</div>}
+            {Object.entries(inventaire.reduce((a,i)=>{a[i.id]=a[i.id]||{obj:i,n:0};a[i.id].n++;return a;},{})).map(([id,{obj,n}])=>(
+              <div key={id} style={{marginBottom:8,background:"rgba(255,255,255,.03)",borderRadius:5,padding:6}}>
+                <div style={{fontSize:7,color:"#c0b8d8",marginBottom:5}}>{obj.e} {obj.nom} ×{n} <span style={{fontSize:6,color:"#484868"}}>— {obj.desc}</span></div>
+                {(obj.maxRevive||obj.revive)?equipe.filter(p=>p.evanoui).map(p=>{const ti=equipe.findIndex(t=>t.id===p.id);return(
+                  <button key={ti} onClick={()=>utiliserObjet(obj,ti)} style={{...BTN(gc2),display:"block",width:"100%",marginBottom:3,padding:"5px 8px",textTransform:"capitalize",textAlign:"left",fontSize:7}}>Sur {p.nom} (K.O.)</button>
+                );}):!obj.held?equipe.filter(p=>!p.evanoui).map(p=>{const ti=equipe.findIndex(t=>t.id===p.id);return(
+                  <button key={ti} onClick={()=>utiliserObjet(obj,ti)} style={{...BTN(gc),display:"block",width:"100%",marginBottom:3,padding:"5px 8px",textTransform:"capitalize",textAlign:"left",fontSize:7}}>Sur {p.nom}</button>
+                );}):equipe.filter(p=>!p.evanoui&&!p.tenu).map(p=>{const ti=equipe.findIndex(t=>t.id===p.id);return(
+                  <button key={ti} onClick={()=>utiliserObjet(obj,ti)} style={{...BTN(gc2),display:"block",width:"100%",marginBottom:3,padding:"5px 8px",textTransform:"capitalize",textAlign:"left",fontSize:7}}>Donner à {p.nom}</button>
+                );})}
+              </div>
+            ))}
+          </div>}
+          {/* Échange */}
+          {voirÉchange&&<div style={{...CARTE({width:"100%",maxWidth:440})}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+              <span style={{fontSize:9,color:gc}}>{besoinÉchange?"QUI COMBAT?":"ÉCHANGE"}</span>
+              {!besoinÉchange&&<button onClick={()=>setVoirÉchange(false)} style={{background:"none",border:"none",color:"#484868",fontSize:14,cursor:"pointer"}}>✕</button>}
+            </div>
+            {equipe.map((p,i)=>(
+              <button key={i} onClick={()=>!p.evanoui&&i!==idxActif&&échangerPokémon(i)} disabled={p.evanoui||i===idxActif}
+                style={{display:"flex",alignItems:"center",gap:8,width:"100%",padding:"7px 8px",marginBottom:5,background:i===idxActif?"rgba(255,255,255,.05)":p.evanoui?"rgba(0,0,0,.3)":"rgba(255,255,255,.03)",border:"1px solid "+(i===idxActif?gc:p.evanoui?"#1a1a2a":"#20203a"),borderRadius:5,color:p.evanoui?"#282838":"#c0c0d8",cursor:p.evanoui||i===idxActif?"not-allowed":"pointer",opacity:p.evanoui?.35:1,fontFamily:"'Press Start 2P',monospace"}}>
+                <img src={p.sprite} alt="" style={{width:32,height:32}}/>
+                <div style={{flex:1,textAlign:"left"}}>
+                  <div style={{fontSize:8,textTransform:"capitalize",color:i===idxActif?gc:"#c0c0d8"}}>{p.nom}</div>
+                  <div style={{fontSize:6,color:"#484868"}}>{p.pv}/{p.pvMax} PV {p.evanoui?"(K.O.)":i===idxActif?"(Combat)":""}</div>
+                </div>
+                <div style={{width:60}}><BarrePV cur={p.pv} max={p.pvMax}/></div>
+              </button>
+            ))}
+          </div>}
+        </div>
+        <PanneauDroit/>
+      </div>
+    );
+  }
+
+  /* ── DÉFAITE ── */
+  if(ecran==="défaite")return(
+    <div style={{minHeight:"100vh",background:gbkg,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{...CARTE({maxWidth:400,textAlign:"center"})}}>
+        <div style={{fontSize:40,marginBottom:10}}>💀</div>
+        <div style={{fontSize:11,color:"#e84848",marginBottom:8,letterSpacing:2}}>DÉFAITE</div>
+        <div style={{fontSize:7,color:"#484868",marginBottom:16}}>{effacés.size-1} zones effacées • {médailles} médailles</div>
+        {equipe.map((p,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid rgba(255,255,255,.05)"}}>
+            <img src={p.sprite} alt="" style={{width:32,height:32,opacity:p.evanoui?.3:1}}/>
+            <span style={{fontSize:7,textTransform:"capitalize",color:p.evanoui?"#282838":"#c0c0d0",flex:1,textAlign:"left"}}>{p.nom}</span>
+            {p.evanoui?<span style={{fontSize:6,color:"#803030"}}>K.O.</span>:<span style={{fontSize:6,color:"#308030"}}>{p.pv}/{p.pvMax}</span>}
+          </div>
+        ))}
+        <button onClick={()=>{setEcran("genSelect");setEquipe([]);setInventaire([]);setMédailles(0);setEffacés(new Set(["dep"]));setDisponibles(["e1","e2"]);setPosActuelle("dep");setEnnemisNœud({});setRévélés({});setGenSel(null);setChargPct(0);tousPoké.current={};réserveRef.current={};}}
+          style={{...BTN("#e84848"),marginTop:16,padding:"10px 24px",fontSize:9}}>RECOMMENCER</button>
       </div>
     </div>
   );
 
-  if(screen==="victory")return(
-    <div style={{minHeight:"100vh",background:BG,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui,sans-serif",color:"#e0e0f0"}}>
-      <div style={{...CARD,maxWidth:400,textAlign:"center"}}>
-        <div style={{fontSize:60,marginBottom:10}}>🏆</div>
-        <div style={{fontSize:20,fontWeight:900,color:"#ffd700",marginBottom:6}}>CHAMPION!</div>
-        <div style={{color:"#888",marginBottom:20}}>You conquered all 20 Arenas!</div>
-        <div style={{marginBottom:20,textAlign:"left"}}>
-          {team.map((p,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"5px 0",borderBottom:"1px solid #1a1a3a"}}>
-              <img src={p.sprite} alt={p.name} style={{width:36,height:36,imageRendering:"pixelated"}}/>
-              <span style={{textTransform:"capitalize",flex:1}}>{p.name}</span>
-              {p.held&&<span style={{fontSize:11,color:"#a78bfa"}}>📦 {p.held}</span>}
-            </div>
-          ))}
-        </div>
-        <button onClick={()=>window.location.reload()} style={{...BTN("#ffd700"),padding:"12px 32px",fontSize:15}}>🔄 Play Again</button>
+  /* ── VICTOIRE ── */
+  if(ecran==="victoire")return(
+    <div style={{minHeight:"100vh",background:gbkg,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{...CARTE({maxWidth:420,textAlign:"center"}),border:"1px solid "+gc}}>
+        <div style={{position:"relative",height:3,background:"linear-gradient(90deg,"+gc+","+gc2+")",marginBottom:16,borderRadius:3}}/>
+        <div style={{fontSize:40,marginBottom:10}}>🏆</div>
+        <div style={{fontSize:11,color:gc,marginBottom:6,letterSpacing:2}}>CHAMPION!</div>
+        <div style={{fontSize:8,color:"#686888",marginBottom:4}}>Région {genSel?GENS[genSel].reg:""} conquise!</div>
+        <div style={{fontSize:7,color:"#484868",marginBottom:14}}>{médailles} médailles remportées</div>
+        {equipe.map((p,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.05)"}}>
+            <img src={p.sprite} alt="" style={{width:32,height:32}}/>
+            <span style={{fontSize:7,textTransform:"capitalize",flex:1,textAlign:"left"}}>{p.nom}</span>
+            {p.tenu&&<span style={{fontSize:6,color:gc2}}>📦 {p.tenu.slice(0,8)}</span>}
+          </div>
+        ))}
+        <button onClick={()=>{setEcran("genSelect");setEquipe([]);setInventaire([]);setMédailles(0);setEffacés(new Set(["dep"]));setDisponibles(["e1","e2"]);setPosActuelle("dep");setEnnemisNœud({});setRévélés({});setGenSel(null);setChargPct(0);tousPoké.current={};réserveRef.current={};}}
+          style={{...BTN(gc),marginTop:14,padding:"10px 24px",fontSize:9}}>REJOUER</button>
       </div>
     </div>
   );
